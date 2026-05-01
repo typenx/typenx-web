@@ -11,9 +11,9 @@ export class HttpClient {
   readonly baseUrl: string
   private readonly fetcher: typeof fetch
 
-  constructor({ baseUrl, fetcher = fetch }: HttpClientOptions) {
+  constructor({ baseUrl, fetcher }: HttpClientOptions) {
     this.baseUrl = baseUrl.replace(/\/+$/, '')
-    this.fetcher = fetcher
+    this.fetcher = (fetcher ?? fetch).bind(globalThis)
   }
 
   get<T>(path: string, init?: RequestInit) {

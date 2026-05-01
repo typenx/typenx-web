@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, BadgeCheck } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { ModeToggle } from '#/components/mode-toggle'
@@ -111,7 +111,7 @@ function AuthOptions({
       <Button
         type="button"
         size="lg"
-        className="w-full"
+        className="w-full bg-[#02A9FF] text-white hover:bg-[#02A9FF]/90 dark:bg-[#02A9FF] dark:hover:bg-[#02A9FF]/90"
         onClick={() => onSelect('anilist')}
       >
         {mode === 'signin' ? 'Sign in' : 'Create account'} with AniList
@@ -120,12 +120,10 @@ function AuthOptions({
       <Button
         type="button"
         size="lg"
-        variant="outline"
-        className="w-full"
+        className="w-full bg-[#2E51A2] text-white hover:bg-[#2E51A2]/90 dark:bg-[#2E51A2] dark:hover:bg-[#2E51A2]/90"
         onClick={() => onSelect('my_anime_list')}
       >
-        <BadgeCheck />
-        {mode === 'signin' ? 'Sign in' : 'Create account'} with MAL
+        {mode === 'signin' ? 'Sign in' : 'Create account'} with MyAnimeList
       </Button>
     </div>
   )
