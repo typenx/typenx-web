@@ -6,3 +6,7 @@ export function getApiBaseUrl() {
     DEFAULT_API_BASE_URL
   )
 }
+
+export function getAuthCallbackPath() {
+  return import.meta.env.VITE_TYPENX_AUTH_CALLBACK_PATH ?? '/auth/callback'
+}

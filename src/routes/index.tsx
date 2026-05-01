@@ -61,7 +61,12 @@ function LoginPage() {
           </div>
         </div>
 
-        <Tabs
+        {!isReady && (
+          <p className="text-sm text-muted-foreground">Checking session...</p>
+        )}
+
+        {isReady && (
+          <Tabs
           value={mode}
           onValueChange={(v) => setMode(v as 'signin' | 'signup')}
           className="w-full"
@@ -77,7 +82,8 @@ function LoginPage() {
           <TabsContent value="signup" className="mt-6">
             <AuthOptions mode="signup" onSelect={handleProviderAuth} />
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        )}
 
         {error && (
           <p className="mt-4 text-center text-sm text-destructive">{error}</p>
