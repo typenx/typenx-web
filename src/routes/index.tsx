@@ -1,19 +1,18 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, BadgeCheck } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import type { AuthProvider } from '#/sdk'
 
 export const Route = createFileRoute('/')({ component: LoginPage })
 
 function LoginPage() {
   const [mode, setMode] = React.useState<'signin' | 'signup'>('signin')
-  const { isAuthenticated, isReady, signIn } = useAuth()
+  const { error, isAuthenticated, isReady, signIn, signUp } = useAuth()
   const navigate = useNavigate()
 
   React.useEffect(() => {
@@ -22,12 +21,12 @@ function LoginPage() {
     }
   }, [isReady, isAuthenticated, navigate])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const data = new FormData(e.currentTarget)
-    const username = String(data.get('username') ?? '').trim()
-    signIn(username || 'guest')
-    navigate({ to: '/anime', replace: true })
+  const handleProviderAuth = (provider: AuthProvider) => {
+    if (mode === 'signin') {
+      void signIn(provider)
+      return
+    }
+    void signUp(provider)
   }
 
   return (
@@ -56,8 +55,8 @@ function LoginPage() {
             </h1>
             <p className="text-sm text-muted-foreground">
               {mode === 'signin'
-                ? 'Sign in to continue to your workspace.'
-                : 'A username and password is all you need.'}
+                ? 'Sign in with your anime list account.'
+                : 'Create a Typenx account from a linked provider.'}
             </p>
           </div>
         </div>
@@ -73,12 +72,16 @@ function LoginPage() {
           </TabsList>
 
           <TabsContent value="signin" className="mt-6">
-            <AuthForm mode="signin" onSubmit={handleSubmit} />
+            <AuthOptions mode="signin" onSelect={handleProviderAuth} />
           </TabsContent>
           <TabsContent value="signup" className="mt-6">
-            <AuthForm mode="signup" onSubmit={handleSubmit} />
+            <AuthOptions mode="signup" onSelect={handleProviderAuth} />
           </TabsContent>
         </Tabs>
+
+        {error && (
+          <p className="mt-4 text-center text-sm text-destructive">{error}</p>
+        )}
 
         <p className="mt-10 text-center text-xs text-muted-foreground">
           By continuing you agree to our{' '}
@@ -96,73 +99,35 @@ function LoginPage() {
   )
 }
 
-function AuthForm({
+function AuthOptions({
   mode,
-  onSubmit,
+  onSelect,
 }: {
   mode: 'signin' | 'signup'
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+  onSelect: (provider: AuthProvider) => void
 }) {
-  const [showPassword, setShowPassword] = React.useState(false)
-
   return (
-    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`${mode}-username`}>Username</Label>
-        <Input
-          id={`${mode}-username`}
-          name="username"
-          type="text"
-          autoComplete="username"
-          placeholder="yourname"
-          required
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor={`${mode}-password`}>Password</Label>
-          {mode === 'signin' && (
-            <a
-              href="#"
-              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Forgot?
-            </a>
-          )}
-        </div>
-        <div className="relative">
-          <Input
-            id={`${mode}-password`}
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete={
-              mode === 'signin' ? 'current-password' : 'new-password'
-            }
-            placeholder="••••••••"
-            required
-            className="pr-10"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((s) => !s)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {showPassword ? (
-              <EyeOff className="size-4" />
-            ) : (
-              <Eye className="size-4" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      <Button type="submit" size="lg" className="mt-2 w-full">
-        {mode === 'signin' ? 'Sign in' : 'Create account'}
+    <div className="flex flex-col gap-3">
+      <Button
+        type="button"
+        size="lg"
+        className="w-full"
+        onClick={() => onSelect('anilist')}
+      >
+        {mode === 'signin' ? 'Sign in' : 'Create account'} with AniList
         <ArrowRight />
       </Button>
-    </form>
+      <Button
+        type="button"
+        size="lg"
+        variant="outline"
+        className="w-full"
+        onClick={() => onSelect('my_anime_list')}
+      >
+        <BadgeCheck />
+        {mode === 'signin' ? 'Sign in' : 'Create account'} with MAL
+      </Button>
+    </div>
   )
 }
 

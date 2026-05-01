@@ -114,11 +114,11 @@ function UserMenu() {
   const navigate = useNavigate()
 
   const handleSignOut = () => {
-    signOut()
+    void signOut()
     navigate({ to: '/', replace: true })
   }
 
-  const username = user?.username ?? 'guest'
+  const username = user?.display_name ?? 'guest'
   const initial = username.charAt(0).toUpperCase()
 
   return (
