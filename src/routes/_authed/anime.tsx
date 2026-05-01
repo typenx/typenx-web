@@ -253,20 +253,27 @@ function selectCatalogAddons(
       addon.manifest?.id ?? '',
     ),
   )
-  const providerOrder = providers.map((provider) =>
-    provider.provider === 'anilist'
-      ? 'typenx-addon-anilist'
-      : 'typenx-addon-myanimelist',
-  )
+  const providerOrder = providers
+    .map((provider) =>
+      provider.provider === 'anilist'
+        ? 'typenx-addon-anilist'
+        : provider.provider === 'my_anime_list'
+          ? 'typenx-addon-myanimelist'
+          : null,
+    )
+    .filter((id): id is string => !!id)
 
-  const selected = providerOrder
+  const linkedOfficial = providerOrder
     .map((manifestId) =>
       official.find((addon) => addon.manifest?.id === manifestId),
     )
     .filter((addon): addon is AddonRegistration => !!addon)
+  const unlinkedOfficial = official.filter(
+    (addon) => !providerOrder.includes(addon.manifest?.id ?? ''),
+  )
+  const selected = uniqueAddons([...linkedOfficial, ...unlinkedOfficial])
 
   if (selected.length > 0) return uniqueAddons(selected)
-  if (official.length > 0) return official
   return enabled
 }
 
