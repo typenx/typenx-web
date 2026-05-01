@@ -120,6 +120,7 @@ function AnimePage() {
               key={row.addon.id}
               title={`${addonName(row.addon)} Anime`}
               caption={row.error ?? `Served by ${addonName(row.addon)}.`}
+              addonId={row.addon.id}
               shows={row.shows}
               isError={!!row.error}
             />
@@ -133,11 +134,13 @@ function AnimePage() {
 function ShowRow({
   title,
   caption,
+  addonId,
   shows,
   isError = false,
 }: {
   title: string
   caption: string
+  addonId: string
   shows: AnimePreview[]
   isError?: boolean
 }) {
@@ -183,14 +186,14 @@ function ShowRow({
       ) : isExpanded ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {shows.map((show) => (
-            <ShowCard key={show.id} show={show} fill />
+            <ShowCard key={show.id} show={show} addonId={addonId} fill />
           ))}
         </div>
       ) : (
         <div className="-mx-6 overflow-x-auto px-6 pb-3 [scrollbar-width:thin]">
           <div className="flex gap-4">
             {shows.map((show) => (
-              <ShowCard key={show.id} show={show} />
+              <ShowCard key={show.id} show={show} addonId={addonId} />
             ))}
           </div>
         </div>
@@ -201,15 +204,18 @@ function ShowRow({
 
 function ShowCard({
   show,
+  addonId,
   fill = false,
 }: {
   show: AnimePreview
+  addonId: string
   fill?: boolean
 }) {
   return (
     <Link
       to="/show/$id"
       params={{ id: show.id }}
+      search={{ addon_id: addonId }}
       className={cn(
         'group flex flex-col text-left transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         fill ? 'w-full' : 'w-40 shrink-0',
