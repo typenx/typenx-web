@@ -141,7 +141,7 @@ function UserMenu() {
     navigate({ to: '/', replace: true })
   }
 
-  const username = user?.display_name ?? 'guest'
+  const username = user?.display_name ?? 'Typenx user'
   const initial = username.charAt(0).toUpperCase()
 
   return (

@@ -13,7 +13,7 @@ function AnimePage() {
   const [shows, setShows] = React.useState<AnimePreview[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const display = user?.display_name ?? 'guest'
+  const display = user?.display_name ?? 'Typenx user'
 
   React.useEffect(() => {
     let cancelled = false

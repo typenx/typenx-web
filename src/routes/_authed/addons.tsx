@@ -92,7 +92,7 @@ function AddonsPage() {
             id="addon-url"
             type="url"
             inputMode="url"
-            placeholder="https://addon.example"
+            placeholder="http://127.0.0.1:8787"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             required
