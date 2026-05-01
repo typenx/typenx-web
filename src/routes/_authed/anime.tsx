@@ -2,18 +2,15 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
 
-import { useAuth } from '#/components/auth-provider'
 import { Button } from '#/components/ui/button'
 import { typenx, type AnimePreview } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/anime')({ component: AnimePage })
 
 function AnimePage() {
-  const { user } = useAuth()
   const [shows, setShows] = React.useState<AnimePreview[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const display = user?.display_name ?? 'Typenx user'
 
   React.useEffect(() => {
     let cancelled = false
@@ -51,18 +48,6 @@ function AnimePage() {
 
   return (
     <div className="px-6 py-8">
-      <div className="mb-10 flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          Dashboard
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back, {display}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Browse anime from your configured Typenx addons.
-        </p>
-      </div>
-
       {isLoading && (
         <p className="text-sm text-muted-foreground">Loading anime...</p>
       )}
