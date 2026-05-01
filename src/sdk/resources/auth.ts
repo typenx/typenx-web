@@ -10,6 +10,12 @@ export class AuthResource {
     )
   }
 
+  link(provider: AuthProvider) {
+    return this.http.get<OAuthLoginResponse>(
+      `/auth/${providerPath(provider)}/link`,
+    )
+  }
+
   signup(provider: AuthProvider) {
     return this.login(provider)
   }
@@ -21,6 +27,11 @@ export class AuthResource {
 
   async redirectToSignup(provider: AuthProvider) {
     await this.redirectToLogin(provider)
+  }
+
+  async redirectToLink(provider: AuthProvider) {
+    const response = await this.link(provider)
+    window.location.assign(response.authorization_url)
   }
 
   logout() {
