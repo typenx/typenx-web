@@ -7,7 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
-import { ChevronsUpDown, LogOut, Settings, Tv } from 'lucide-react'
+import { ChevronsUpDown, LogOut, Puzzle, Settings, Tv } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { BrandMark } from '#/components/brand'
@@ -53,6 +53,7 @@ export const Route = createFileRoute('/_authed')({
 
 const NAV_ITEMS = [
   { to: '/anime', label: 'Anime', icon: Tv },
+  { to: '/addons', label: 'Addons', icon: Puzzle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const
 
