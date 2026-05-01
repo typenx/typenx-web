@@ -9,7 +9,7 @@ import {
 import { ChevronsUpDown, LogOut, Settings, Tv } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
-import { BrandLockup } from '#/components/brand'
+import { BrandMark } from '#/components/brand'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import {
@@ -79,8 +79,13 @@ function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-3 py-4">
-        <BrandLockup />
+      <SidebarHeader className="py-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center px-3">
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <BrandMark className="size-7 shrink-0" />
+          <span className="text-sm font-medium tracking-tight group-data-[collapsible=icon]:hidden">
+            typenx
+          </span>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
