@@ -38,6 +38,8 @@ import {
 
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async ({ location }) => {
+    if (typeof window === 'undefined') return
+
     try {
       return await typenx.me.current()
     } catch {
