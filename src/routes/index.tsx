@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 
+import { useAuth } from '#/components/auth-provider'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -12,6 +13,22 @@ export const Route = createFileRoute('/')({ component: LoginPage })
 
 function LoginPage() {
   const [mode, setMode] = React.useState<'signin' | 'signup'>('signin')
+  const { isAuthenticated, isReady, signIn } = useAuth()
+  const navigate = useNavigate()
+
+  React.useEffect(() => {
+    if (isReady && isAuthenticated) {
+      navigate({ to: '/anime', replace: true })
+    }
+  }, [isReady, isAuthenticated, navigate])
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const data = new FormData(e.currentTarget)
+    const username = String(data.get('username') ?? '').trim()
+    signIn(username || 'guest')
+    navigate({ to: '/anime', replace: true })
+  }
 
   return (
     <div className="relative min-h-svh w-full overflow-hidden bg-background">
@@ -56,10 +73,10 @@ function LoginPage() {
           </TabsList>
 
           <TabsContent value="signin" className="mt-6">
-            <AuthForm mode="signin" />
+            <AuthForm mode="signin" onSubmit={handleSubmit} />
           </TabsContent>
           <TabsContent value="signup" className="mt-6">
-            <AuthForm mode="signup" />
+            <AuthForm mode="signup" onSubmit={handleSubmit} />
           </TabsContent>
         </Tabs>
 
@@ -79,23 +96,24 @@ function LoginPage() {
   )
 }
 
-function AuthForm({ mode }: { mode: 'signin' | 'signup' }) {
+function AuthForm({
+  mode,
+  onSubmit,
+}: {
+  mode: 'signin' | 'signup'
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+}) {
   const [showPassword, setShowPassword] = React.useState(false)
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault()
-      }}
-    >
+    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${mode}-username`}>Username</Label>
         <Input
           id={`${mode}-username`}
           name="username"
           type="text"
-          autoComplete={mode === 'signin' ? 'username' : 'username'}
+          autoComplete="username"
           placeholder="yourname"
           required
         />

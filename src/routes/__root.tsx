@@ -1,6 +1,8 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 
+import { AuthProvider } from '#/components/auth-provider'
 import { ThemeProvider } from '#/components/theme-provider'
+import { TooltipProvider } from '#/components/ui/tooltip'
 import appCss from '../styles.css?url'
 
 const noFlashScript = `(function(){try{var s=localStorage.getItem('typenx-theme')||'system';var d=s==='dark'||(s==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');document.documentElement.style.colorScheme=d?'dark':'light';}catch(e){}})();`
@@ -25,7 +27,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </TooltipProvider>
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
