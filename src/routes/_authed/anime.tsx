@@ -146,18 +146,19 @@ function AnimePage() {
 
   return (
     <div className="px-6 py-8">
-      <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Dashboard
-          </span>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back, {display}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Browse anime from your linked provider addons.
-          </p>
-        </div>
+      <div className="mb-6 flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Dashboard
+        </span>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome back, {display}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Browse anime from your linked provider addons.
+        </p>
+      </div>
+
+      <div className="mb-10">
         <SearchBar
           query={query}
           onQueryChange={setQuery}
@@ -398,7 +399,7 @@ function SearchBar({
   isSearching: boolean
 }) {
   return (
-    <InputGroup className="h-10 w-full sm:w-80">
+    <InputGroup className="h-10 w-full max-w-xl">
       <InputGroupAddon>
         {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
       </InputGroupAddon>
@@ -423,15 +424,11 @@ function selectCatalogAddons(
       addon.manifest?.id ?? '',
     ),
   )
-  const providerOrder = providers
-    .map((provider) =>
-      provider.provider === 'anilist'
-        ? 'typenx-addon-anilist'
-        : provider.provider === 'my_anime_list'
-          ? 'typenx-addon-myanimelist'
-          : null,
-    )
-    .filter((id): id is string => !!id)
+  const providerOrder: string[] = providers.map((provider) =>
+    provider.provider === 'anilist'
+      ? 'typenx-addon-anilist'
+      : 'typenx-addon-myanimelist',
+  )
 
   const linkedOfficial = providerOrder
     .map((manifestId) =>
