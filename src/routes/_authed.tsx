@@ -3,6 +3,7 @@ import {
   Link,
   Outlet,
   createFileRoute,
+  redirect,
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
@@ -20,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Separator } from '#/components/ui/separator'
+import { typenx } from '#/sdk'
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +36,20 @@ import {
   SidebarTrigger,
 } from '#/components/ui/sidebar'
 
-export const Route = createFileRoute('/_authed')({ component: AuthedLayout })
+export const Route = createFileRoute('/_authed')({
+  beforeLoad: async ({ location }) => {
+    try {
+      return await typenx.me.current()
+    } catch {
+      throw redirect({
+        to: '/',
+        search: { redirect: location.href },
+        replace: true,
+      })
+    }
+  },
+  component: AuthedLayout,
+})
 
 const NAV_ITEMS = [
   { to: '/anime', label: 'Anime', icon: Tv },

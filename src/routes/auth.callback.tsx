@@ -13,8 +13,24 @@ function AuthCallbackPage() {
 
   React.useEffect(() => {
     void refresh()
-      .then(() => navigate({ to: '/anime', replace: true }))
-      .catch(() => navigate({ to: '/', replace: true }))
+      .then((user) => {
+        if (user) {
+          navigate({ to: '/anime', replace: true })
+          return
+        }
+        navigate({
+          to: '/',
+          search: { auth_error: 'session_not_found' },
+          replace: true,
+        })
+      })
+      .catch(() =>
+        navigate({
+          to: '/',
+          search: { auth_error: 'callback_failed' },
+          replace: true,
+        }),
+      )
   }, [navigate, refresh])
 
   return (

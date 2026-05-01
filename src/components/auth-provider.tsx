@@ -7,7 +7,7 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isReady: boolean
   error: string | null
-  refresh: () => Promise<void>
+  refresh: () => Promise<User | null>
   signIn: (provider: AuthProvider) => Promise<void>
   signUp: (provider: AuthProvider) => Promise<void>
   signOut: () => Promise<void>
@@ -25,14 +25,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const current = await typenx.me.current()
       setUser(current.user)
       setError(null)
+      return current.user
     } catch (err) {
       if (isTypenxApiError(err) && err.status === 401) {
         setUser(null)
         setError(null)
-        return
+        return null
       }
       setUser(null)
       setError(err instanceof Error ? err.message : 'Unable to load session')
+      return null
     }
   }, [])
 

@@ -1,19 +1,35 @@
 import * as React from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
-import type { AuthProvider } from '#/sdk'
+import { typenx, type AuthProvider } from '#/sdk'
 
-export const Route = createFileRoute('/')({ component: LoginPage })
+export const Route = createFileRoute('/')({
+  validateSearch: (search): { auth_error?: string; redirect?: string } => ({
+    auth_error:
+      typeof search.auth_error === 'string' ? search.auth_error : undefined,
+    redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+  }),
+  beforeLoad: async () => {
+    try {
+      await typenx.me.current()
+    } catch {
+      return
+    }
+    throw redirect({ to: '/anime', replace: true })
+  },
+  component: LoginPage,
+})
 
 function LoginPage() {
   const [mode, setMode] = React.useState<'signin' | 'signup'>('signin')
   const { error, isAuthenticated, isReady, signIn, signUp } = useAuth()
   const navigate = useNavigate()
+  const search = Route.useSearch()
 
   React.useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -85,8 +101,11 @@ function LoginPage() {
           </Tabs>
         )}
 
-        {error && (
-          <p className="mt-4 text-center text-sm text-destructive">{error}</p>
+        {(error || search.auth_error) && (
+          <p className="mt-4 text-center text-sm text-destructive">
+            {error ??
+              'Sign in finished, but the browser did not send back a Typenx session. Please retry from http://127.0.0.1:3000.'}
+          </p>
         )}
 
         <p className="mt-10 text-center text-xs text-muted-foreground">
