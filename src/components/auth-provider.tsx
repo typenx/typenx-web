@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = React.useCallback(async () => {
     try {
-      const profile = await typenx.me.profile()
+      const profile = await loadProfile()
       setUser(profile)
       setError(null)
       return profile
@@ -70,6 +70,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+async function loadProfile() {
+  try {
+    return await typenx.me.profile()
+  } catch (err) {
+    if (isTypenxApiError(err) && err.status === 404) {
+      const current = await typenx.me.current()
+      return current.user
+    }
+
+    throw err
+  }
 }
 
 export function useAuth() {
