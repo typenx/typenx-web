@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useTheme } from 'next-themes'
 
+import { friendlyAuthError } from '#/lib/auth-errors'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Separator } from '#/components/ui/separator'
@@ -9,6 +10,12 @@ import { typenx } from '#/sdk'
 import type { AddonRegistration, AuthProvider, ProviderAccount } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/settings')({
+  validateSearch: (search): { account_error?: string } => ({
+    account_error:
+      typeof search.account_error === 'string'
+        ? search.account_error
+        : undefined,
+  }),
   component: SettingsPage,
 })
 
@@ -20,6 +27,8 @@ const THEMES = [
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const search = Route.useSearch()
+  const accountErrorMessage = friendlyAuthError(search.account_error)
   const [addons, setAddons] = React.useState<AddonRegistration[]>([])
   const [addonsError, setAddonsError] = React.useState<string | null>(null)
   const [providers, setProviders] = React.useState<ProviderAccount[]>([])
@@ -112,6 +121,12 @@ function SettingsPage() {
             Connect AniList and MyAnimeList to this local account.
           </p>
         </div>
+
+        {accountErrorMessage && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {accountErrorMessage}
+          </p>
+        )}
 
         {providersError && (
           <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">

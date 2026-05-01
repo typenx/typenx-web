@@ -3,11 +3,12 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
+import { friendlyAuthError } from '#/lib/auth-errors'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
-import { typenx  } from '#/sdk'
-import type {AuthProvider} from '#/sdk';
+import { typenx } from '#/sdk'
+import type { AuthProvider } from '#/sdk'
 
 export const Route = createFileRoute('/')({
   validateSearch: (search): { auth_error?: string; redirect?: string } => ({
@@ -31,6 +32,7 @@ function LoginPage() {
   const { error, isAuthenticated, isReady, signIn, signUp } = useAuth()
   const navigate = useNavigate()
   const search = Route.useSearch()
+  const authErrorMessage = friendlyAuthError(search.auth_error)
 
   React.useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -102,10 +104,9 @@ function LoginPage() {
           </Tabs>
         )}
 
-        {(error || search.auth_error) && (
+        {(error || authErrorMessage) && (
           <p className="mt-4 text-center text-sm text-destructive">
-            {error ??
-              'Sign in finished, but the browser did not send back a Typenx session. Please retry from http://127.0.0.1:3000.'}
+            {error ?? authErrorMessage}
           </p>
         )}
 
