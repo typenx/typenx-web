@@ -14,7 +14,9 @@ import { typenx } from '#/sdk'
 import type {
   AddonRegistration,
   AddonSearchResult,
+  AnimeListEntry,
   AnimePreview,
+  AuthProvider,
   ProviderAccount,
 } from '#/sdk'
 
@@ -26,9 +28,16 @@ type CatalogRow = {
   error: string | null
 }
 
+type WatchingShow = {
+  addon: AddonRegistration
+  entry: AnimeListEntry
+  show: AnimePreview
+}
+
 function AnimePage() {
   const { user } = useAuth()
   const [rows, setRows] = React.useState<CatalogRow[]>([])
+  const [watching, setWatching] = React.useState<WatchingShow[]>([])
   const [query, setQuery] = React.useState('')
   const [searchResults, setSearchResults] = React.useState<AddonSearchResult[]>(
     [],
@@ -46,39 +55,46 @@ function AnimePage() {
     async function loadCatalog() {
       try {
         setIsLoading(true)
-        const [addons, providers] = await Promise.all([
+        const [addons, providers, library] = await Promise.all([
           typenx.addons.list(),
           typenx.me.providers(),
+          typenx.me.library(),
         ])
         const selectedAddons = selectCatalogAddons(addons, providers)
-        const loadedRows = await Promise.all(
-          selectedAddons.map(async (addon) => {
-            try {
-              const response = await typenx.catalog.catalogs({
-                addon_id: addon.id,
-                catalog_id: preferredCatalogId(addon),
-                limit: 24,
-              })
-              return { addon, shows: response.items, error: null }
-            } catch (err) {
-              return {
-                addon,
-                shows: [],
-                error:
-                  err instanceof Error
-                    ? err.message
-                    : `Unable to load ${addonName(addon)}`,
+        const [loadedRows, loadedWatching] = await Promise.all([
+          Promise.all(
+            selectedAddons.map(async (addon) => {
+              try {
+                const response = await typenx.catalog.catalogs({
+                  addon_id: addon.id,
+                  catalog_id: preferredCatalogId(addon),
+                  limit: 24,
+                })
+                return { addon, shows: response.items, error: null }
+              } catch (err) {
+                return {
+                  addon,
+                  shows: [],
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : `Unable to load ${addonName(addon)}`,
+                }
               }
-            }
-          }),
-        )
+            }),
+          ),
+          loadCurrentlyWatching(library, selectedAddons),
+        ])
+
         if (!cancelled) {
           setRows(loadedRows)
+          setWatching(loadedWatching)
           setError(null)
         }
       } catch (err) {
         if (!cancelled) {
           setRows([])
+          setWatching([])
           setError(
             err instanceof Error
               ? err.message
@@ -179,12 +195,13 @@ function AnimePage() {
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && watching.length === 0 ? (
         <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
           No anime came back from the configured addons.
         </div>
       ) : (
         <div className="flex flex-col gap-10">
+          {watching.length > 0 && <CurrentlyWatchingRow shows={watching} />}
           {rows.map((row) => (
             <ShowRow
               key={row.addon.id}
@@ -198,6 +215,84 @@ function AnimePage() {
         </div>
       )}
     </div>
+  )
+}
+
+async function loadCurrentlyWatching(
+  library: AnimeListEntry[],
+  addons: AddonRegistration[],
+) {
+  const watchingEntries = library
+    .filter((entry) => entry.status === 'watching')
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
+    .slice(0, 12)
+
+  const loaded = await Promise.all(
+    watchingEntries.map(async (entry) => {
+      const addon = addonForProvider(addons, entry.provider)
+      if (!addon) return null
+
+      try {
+        const response = await typenx.catalog.search({
+          addon_id: addon.id,
+          query: entry.title,
+          limit: 5,
+        })
+        const show =
+          response.items.find((item) => item.id === entry.provider_anime_id) ??
+          response.items.find(
+            (item) => item.title.toLowerCase() === entry.title.toLowerCase(),
+          ) ??
+          response.items[0]
+
+        if (!show) return null
+        return { addon, entry, show }
+      } catch {
+        return {
+          addon,
+          entry,
+          show: {
+            id: entry.provider_anime_id,
+            title: entry.title,
+            poster: null,
+            year: null,
+            content_type: 'anime' as const,
+          },
+        }
+      }
+    }),
+  )
+
+  return loaded.filter((item): item is WatchingShow => !!item)
+}
+
+function CurrentlyWatchingRow({ shows }: { shows: WatchingShow[] }) {
+  return (
+    <section>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Continue watching
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Synced from your linked anime list.
+        </p>
+      </div>
+      <div className="-mx-6 overflow-x-auto px-6 pb-3 [scrollbar-width:thin]">
+        <div className="flex gap-4">
+          {shows.map(({ addon, entry, show }) => (
+            <ShowCard
+              key={`${entry.provider}:${entry.provider_anime_id}`}
+              show={show}
+              addonId={addon.id}
+              addonLabel={watchingLabel(entry, addon)}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -424,7 +519,7 @@ function selectCatalogAddons(
       addon.manifest?.id ?? '',
     ),
   )
-  const providerOrder: string[] = providers.map((provider) =>
+  const providerOrder = providers.map((provider) =>
     provider.provider === 'anilist'
       ? 'typenx-addon-anilist'
       : 'typenx-addon-myanimelist',
@@ -457,6 +552,24 @@ function preferredCatalogId(addon: AddonRegistration) {
   const catalogs = addon.manifest?.catalogs ?? []
   if (catalogs.some((catalog) => catalog.id === 'popular')) return 'popular'
   return catalogs[0]?.id ?? 'popular'
+}
+
+function addonForProvider(addons: AddonRegistration[], provider: AuthProvider) {
+  const manifestId =
+    provider === 'anilist'
+      ? 'typenx-addon-anilist'
+      : 'typenx-addon-myanimelist'
+
+  return addons.find((addon) => addon.manifest?.id === manifestId)
+}
+
+function watchingLabel(entry: AnimeListEntry, addon: AddonRegistration) {
+  const progress =
+    entry.total_episodes && entry.total_episodes > 0
+      ? `${entry.progress_episodes}/${entry.total_episodes} eps`
+      : `${entry.progress_episodes} eps`
+
+  return `${progress} - ${addonName(addon)}`
 }
 
 function addonName(addon: AddonRegistration) {
