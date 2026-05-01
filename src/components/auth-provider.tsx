@@ -1,6 +1,7 @@
 import * as React from 'react'
 
-import { isTypenxApiError, typenx, type AuthProvider, type User } from '#/sdk'
+import { isTypenxApiError, typenx   } from '#/sdk'
+import type {AuthProvider, User} from '#/sdk';
 
 type AuthContextValue = {
   user: User | null

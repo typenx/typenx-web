@@ -15,6 +15,13 @@ export default [
     },
   },
   {
+    files: ['src/components/ui/**'],
+    rules: {
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      'no-shadow': 'off',
+    },
+  },
+  {
     ignores: ['eslint.config.js', 'prettier.config.js'],
   },
 ]

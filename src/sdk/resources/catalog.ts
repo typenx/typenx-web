@@ -17,7 +17,10 @@ export class CatalogResource {
     return this.http.post<CatalogResponse>('/search', request)
   }
 
-  anime(animeId: string) {
-    return this.http.get<AnimeMetadata>(`/anime/${encodeURIComponent(animeId)}`)
+  anime(animeId: string, addonId?: string) {
+    const query = addonId ? `?addon_id=${encodeURIComponent(addonId)}` : ''
+    return this.http.get<AnimeMetadata>(
+      `/anime/${encodeURIComponent(animeId)}${query}`,
+    )
   }
 }

@@ -6,7 +6,8 @@ import { useAuth } from '#/components/auth-provider'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
-import { typenx, type AuthProvider } from '#/sdk'
+import { typenx  } from '#/sdk'
+import type {AuthProvider} from '#/sdk';
 
 export const Route = createFileRoute('/')({
   validateSearch: (search): { auth_error?: string; redirect?: string } => ({
@@ -83,21 +84,21 @@ function LoginPage() {
 
         {isReady && (
           <Tabs
-          value={mode}
-          onValueChange={(v) => setMode(v as 'signin' | 'signup')}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Sign in</TabsTrigger>
-            <TabsTrigger value="signup">Sign up</TabsTrigger>
-          </TabsList>
+            value={mode}
+            onValueChange={(v) => setMode(v as 'signin' | 'signup')}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Sign in</TabsTrigger>
+              <TabsTrigger value="signup">Sign up</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="signin" className="mt-6">
-            <AuthOptions mode="signin" onSelect={handleProviderAuth} />
-          </TabsContent>
-          <TabsContent value="signup" className="mt-6">
-            <AuthOptions mode="signup" onSelect={handleProviderAuth} />
-          </TabsContent>
+            <TabsContent value="signin" className="mt-6">
+              <AuthOptions mode="signin" onSelect={handleProviderAuth} />
+            </TabsContent>
+            <TabsContent value="signup" className="mt-6">
+              <AuthOptions mode="signup" onSelect={handleProviderAuth} />
+            </TabsContent>
           </Tabs>
         )}
 

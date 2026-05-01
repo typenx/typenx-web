@@ -5,7 +5,8 @@ import { useTheme } from 'next-themes'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Separator } from '#/components/ui/separator'
-import { typenx, type AddonRegistration } from '#/sdk'
+import { typenx  } from '#/sdk'
+import type {AddonRegistration} from '#/sdk';
 
 export const Route = createFileRoute('/_authed/settings')({
   component: SettingsPage,
@@ -28,7 +29,9 @@ function SettingsPage() {
       setAddons(next)
       setAddonsError(null)
     } catch (err) {
-      setAddonsError(err instanceof Error ? err.message : 'Unable to load addons')
+      setAddonsError(
+        err instanceof Error ? err.message : 'Unable to load addons',
+      )
     }
   }, [])
 
@@ -139,7 +142,9 @@ function AddonItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-sm font-medium">{name}</h3>
-          {addon.source === 'built_in' && <Badge variant="secondary">Built-in</Badge>}
+          {addon.source === 'built_in' && (
+            <Badge variant="secondary">Built-in</Badge>
+          )}
         </div>
         <p className="line-clamp-2 text-xs text-muted-foreground">
           {description}

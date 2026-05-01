@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from './config'
-import { HttpClient, type HttpClientOptions } from './http'
+import { HttpClient  } from './http'
+import type {HttpClientOptions} from './http';
 import { AddonsResource } from './resources/addons'
 import { AuthResource } from './resources/auth'
 import { CatalogResource } from './resources/catalog'

@@ -71,11 +71,7 @@ export type WatchProgress = {
   updated_at: string
 }
 
-export type AddonResource =
-  | 'catalog'
-  | 'search'
-  | 'anime_meta'
-  | 'episode_meta'
+export type AddonResource = 'catalog' | 'search' | 'anime_meta' | 'episode_meta'
 
 export type ContentType = 'anime' | 'movie' | 'ova' | 'ona' | 'special'
 
@@ -118,6 +114,7 @@ export type RegisterAddonRequest = {
 }
 
 export type CatalogRequest = {
+  addon_id?: string
   catalog_id: string
   skip?: number
   limit?: number
@@ -125,6 +122,7 @@ export type CatalogRequest = {
 }
 
 export type SearchRequest = {
+  addon_id?: string
   query: string
   limit?: number
 }

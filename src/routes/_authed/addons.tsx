@@ -7,9 +7,12 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Separator } from '#/components/ui/separator'
-import { isTypenxApiError, typenx, type AddonRegistration } from '#/sdk'
+import { isTypenxApiError, typenx  } from '#/sdk'
+import type {AddonRegistration} from '#/sdk';
 
-export const Route = createFileRoute('/_authed/addons')({ component: AddonsPage })
+export const Route = createFileRoute('/_authed/addons')({
+  component: AddonsPage,
+})
 
 function AddonsPage() {
   const [addons, setAddons] = React.useState<AddonRegistration[]>([])
@@ -104,9 +107,7 @@ function AddonsPage() {
         </div>
       </form>
 
-      {error && (
-        <p className="mt-4 text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
       <Separator className="my-8" />
 

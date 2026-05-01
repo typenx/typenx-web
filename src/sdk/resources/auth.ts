@@ -5,7 +5,9 @@ export class AuthResource {
   constructor(private readonly http: HttpClient) {}
 
   login(provider: AuthProvider) {
-    return this.http.get<OAuthLoginResponse>(`/auth/${providerPath(provider)}/login`)
+    return this.http.get<OAuthLoginResponse>(
+      `/auth/${providerPath(provider)}/login`,
+    )
   }
 
   signup(provider: AuthProvider) {
