@@ -19,4 +19,8 @@ export class AddonsResource {
   manifest(addonId: string) {
     return this.http.get<AddonManifest>(`/addons/${addonId}/manifest`)
   }
+
+  delete(addonId: string) {
+    return this.http.delete<void>(`/addons/${addonId}`)
+  }
 }

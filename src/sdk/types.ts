@@ -84,6 +84,7 @@ export type AddonManifest = {
   name: string
   version: string
   description: string | null
+  icon: string | null
   resources: AddonResource[]
   catalogs: CatalogDefinition[]
 }
@@ -105,6 +106,8 @@ export type AddonRegistration = {
   id: string
   base_url: string
   enabled: boolean
+  source: 'built_in' | 'user'
+  deletable: boolean
   manifest: AddonManifest | null
   created_at: string
   updated_at: string

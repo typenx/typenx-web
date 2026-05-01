@@ -34,6 +34,10 @@ export class HttpClient {
     })
   }
 
+  delete<T>(path: string, init?: RequestInit) {
+    return this.request<T>(path, { ...init, method: 'DELETE' })
+  }
+
   async request<T>(path: string, init: RequestInit = {}) {
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       credentials: 'include',
