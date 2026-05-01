@@ -1,13 +1,19 @@
 import * as React from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ChevronRight, ChevronUp, Loader2 } from 'lucide-react'
+import { ChevronRight, ChevronUp, Loader2, Search } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { cn } from '#/lib/utils'
 import { Button } from '#/components/ui/button'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import { typenx } from '#/sdk'
 import type {
   AddonRegistration,
+  AddonSearchResult,
   AnimePreview,
   ProviderAccount,
 } from '#/sdk'
@@ -23,9 +29,16 @@ type CatalogRow = {
 function AnimePage() {
   const { user } = useAuth()
   const [rows, setRows] = React.useState<CatalogRow[]>([])
+  const [query, setQuery] = React.useState('')
+  const [searchResults, setSearchResults] = React.useState<AddonSearchResult[]>(
+    [],
+  )
+  const [isSearching, setIsSearching] = React.useState(false)
+  const [searchError, setSearchError] = React.useState<string | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const display = user?.display_name ?? 'Typenx user'
+  const trimmedQuery = query.trim()
 
   React.useEffect(() => {
     let cancelled = false
@@ -83,37 +96,93 @@ function AnimePage() {
     }
   }, [])
 
+  React.useEffect(() => {
+    let cancelled = false
+
+    if (trimmedQuery.length < 2) {
+      setSearchResults([])
+      setSearchError(null)
+      setIsSearching(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      async function searchAnime() {
+        try {
+          setIsSearching(true)
+          const results = await typenx.catalog.searchAddons({
+            query: trimmedQuery,
+            limit: 18,
+          })
+
+          if (!cancelled) {
+            setSearchResults(results)
+            setSearchError(null)
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setSearchResults([])
+            setSearchError(
+              err instanceof Error
+                ? err.message
+                : 'Unable to search anime addons',
+            )
+          }
+        } finally {
+          if (!cancelled) setIsSearching(false)
+        }
+      }
+
+      void searchAnime()
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [trimmedQuery])
+
   return (
     <div className="px-6 py-8">
-      <div className="mb-10 flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          Dashboard
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back, {display}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Browse anime from your linked provider addons.
-        </p>
+      <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Dashboard
+          </span>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Welcome back, {display}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Browse anime from your linked provider addons.
+          </p>
+        </div>
+        <SearchBar
+          query={query}
+          onQueryChange={setQuery}
+          isSearching={isSearching}
+        />
       </div>
 
-      {isLoading && (
+      {trimmedQuery.length > 0 ? (
+        <SearchResults
+          query={trimmedQuery}
+          results={searchResults}
+          isSearching={isSearching}
+          error={searchError}
+        />
+      ) : isLoading ? (
         <p className="text-sm text-muted-foreground">Loading anime...</p>
-      )}
-
-      {!isLoading && error && (
+      ) : error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
-      )}
-
-      {!isLoading && !error && rows.length === 0 && (
+      ) : rows.length === 0 ? (
         <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
           No anime came back from the configured addons.
         </div>
-      )}
-
-      {!isLoading && !error && rows.length > 0 && (
+      ) : (
         <div className="flex flex-col gap-10">
           {rows.map((row) => (
             <ShowRow
@@ -205,10 +274,12 @@ function ShowRow({
 function ShowCard({
   show,
   addonId,
+  addonLabel,
   fill = false,
 }: {
   show: AnimePreview
   addonId: string
+  addonLabel?: string
   fill?: boolean
 }) {
   return (
@@ -237,9 +308,108 @@ function ShowCard({
       </div>
       <p className="mt-2 truncate text-sm font-medium">{show.title}</p>
       <p className="text-xs capitalize text-muted-foreground">
-        {show.year ?? 'Unknown year'}
+        {[show.year ?? 'Unknown year', addonLabel].filter(Boolean).join(' - ')}
       </p>
     </Link>
+  )
+}
+
+function SearchResults({
+  query,
+  results,
+  isSearching,
+  error,
+}: {
+  query: string
+  results: AddonSearchResult[]
+  isSearching: boolean
+  error: string | null
+}) {
+  if (query.length < 2) {
+    return (
+      <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+        Keep typing to search AniList and MyAnimeList.
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        {error}
+      </div>
+    )
+  }
+
+  if (isSearching && results.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Searching AniList and MyAnimeList...
+      </div>
+    )
+  }
+
+  if (results.length === 0) {
+    return (
+      <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+        No anime matched "{query}".
+      </div>
+    )
+  }
+
+  return (
+    <section>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            Search results
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {results.length} matches across AniList and MyAnimeList
+          </p>
+        </div>
+        {isSearching && (
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        {results.map((result) => (
+          <ShowCard
+            key={`${result.addon.id}:${result.item.id}`}
+            show={result.item}
+            addonId={result.addon.id}
+            addonLabel={addonName(result.addon)}
+            fill
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SearchBar({
+  query,
+  onQueryChange,
+  isSearching,
+}: {
+  query: string
+  onQueryChange: (query: string) => void
+  isSearching: boolean
+}) {
+  return (
+    <InputGroup className="h-10 w-full sm:w-80">
+      <InputGroupAddon>
+        {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
+      </InputGroupAddon>
+      <InputGroupInput
+        type="search"
+        placeholder="Search anime..."
+        aria-label="Search anime"
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+    </InputGroup>
   )
 }
 

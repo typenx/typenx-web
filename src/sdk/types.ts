@@ -127,6 +127,11 @@ export type SearchRequest = {
   limit?: number
 }
 
+export type AddonSearchResult = {
+  addon: AddonRegistration
+  item: AnimePreview
+}
+
 export type CatalogResponse = {
   items: AnimePreview[]
 }
