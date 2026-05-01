@@ -33,6 +33,11 @@ type WatchingShow = {
   show: AnimePreview
 }
 
+type FeaturedShow = {
+  addon: AddonRegistration
+  show: AnimePreview
+}
+
 function AnimePage() {
   const { q = '' } = Route.useSearch()
   const [rows, setRows] = React.useState<CatalogRow[]>([])
@@ -158,9 +163,19 @@ function AnimePage() {
   }, [trimmedQuery])
 
   const featured = React.useMemo(() => {
-    if (watching.length > 0 && watching[0]) return watching[0].show
+    if (watching.length > 0 && watching[0]) {
+      return {
+        addon: watching[0].addon,
+        show: watching[0].show,
+      }
+    }
     for (const row of rows) {
-      if (row.shows.length > 0 && row.shows[0]) return row.shows[0]
+      if (row.shows.length > 0 && row.shows[0]) {
+        return {
+          addon: row.addon,
+          show: row.shows[0],
+        }
+      }
     }
     return null
   }, [watching, rows])
@@ -207,50 +222,76 @@ function AnimePage() {
   )
 }
 
-function FeaturedHero({ show }: { show: AnimePreview | null }) {
-  const backdrop =
-    show?.poster ??
-    `https://picsum.photos/seed/typenx-hero-${show?.id ?? 'default'}/1600/600`
+function FeaturedHero({ show }: { show: FeaturedShow | null }) {
+  const anime = show?.show
+  const backdrop = anime?.banner ?? anime?.poster ?? null
 
   return (
-    <section className="relative overflow-hidden border-b border-border">
+    <section className="relative min-h-[360px] overflow-hidden border-b border-border">
       <div className="absolute inset-0">
-        <img
-          src={backdrop}
-          alt=""
-          className="h-full w-full object-cover opacity-30"
-        />
+        {backdrop ? (
+          <img
+            src={backdrop}
+            alt=""
+            className="h-full w-full object-cover opacity-40"
+          />
+        ) : (
+          <div className="h-full w-full bg-muted" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/40" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
       </div>
 
-      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-4 px-6 py-14 sm:py-20">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          Featured
-        </span>
-        <h1 className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
-          {show?.title ?? 'Discover what’s airing'}
-        </h1>
-        {show?.synopsis ? (
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground line-clamp-3">
-            {show.synopsis}
-          </p>
-        ) : (
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Pick up where you left off, or jump into something new from your
-            linked addons.
-          </p>
+      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6 px-6 py-12 sm:flex-row sm:items-end sm:py-16">
+        {anime?.poster && (
+          <Link
+            to="/show/$id"
+            params={{ id: anime.id }}
+            search={{ addon_id: show.addon.id }}
+            className="w-32 shrink-0 overflow-hidden rounded-lg bg-muted shadow-2xl ring-1 ring-border/60 transition-opacity hover:opacity-95 sm:w-40"
+          >
+            <div className="aspect-[2/3]">
+              <img
+                src={anime.poster}
+                alt={anime.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </Link>
         )}
-        {show && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="lg" asChild className="gap-2">
-              <Link to="/show/$id" params={{ id: show.id }}>
-                <Play className="fill-current" />
-                Play
-              </Link>
-            </Button>
-          </div>
-        )}
+
+        <div className="flex max-w-2xl flex-col gap-4">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Featured
+          </span>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            {anime?.title ?? "Discover what's airing"}
+          </h1>
+          {anime?.synopsis ? (
+            <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">
+              {anime.synopsis}
+            </p>
+          ) : (
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Pick up where you left off, or jump into something new from your
+              linked addons.
+            </p>
+          )}
+          {anime && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="lg" asChild className="gap-2">
+                <Link
+                  to="/show/$id"
+                  params={{ id: anime.id }}
+                  search={{ addon_id: show.addon.id }}
+                >
+                  <Play className="fill-current" />
+                  Play
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
