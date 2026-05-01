@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ChevronRight, ChevronUp, Loader2 } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
@@ -207,8 +207,9 @@ function ShowCard({
   fill?: boolean
 }) {
   return (
-    <button
-      type="button"
+    <Link
+      to="/show/$id"
+      params={{ id: show.id }}
       className={cn(
         'group flex flex-col text-left transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         fill ? 'w-full' : 'w-40 shrink-0',
@@ -232,7 +233,7 @@ function ShowCard({
       <p className="text-xs capitalize text-muted-foreground">
         {show.year ?? 'Unknown year'}
       </p>
-    </button>
+    </Link>
   )
 }
 

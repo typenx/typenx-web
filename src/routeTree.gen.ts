@@ -15,6 +15,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
 import { Route as AuthedAnimeRouteImport } from './routes/_authed/anime'
 import { Route as AuthedAddonsRouteImport } from './routes/_authed/addons'
+import { Route as AuthedShowIdRouteImport } from './routes/_authed/show.$id'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -45,6 +46,11 @@ const AuthedAddonsRoute = AuthedAddonsRouteImport.update({
   path: '/addons',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedShowIdRoute = AuthedShowIdRouteImport.update({
+  id: '/show/$id',
+  path: '/show/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/anime': typeof AuthedAnimeRoute
   '/settings': typeof AuthedSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/show/$id': typeof AuthedShowIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/anime': typeof AuthedAnimeRoute
   '/settings': typeof AuthedSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/show/$id': typeof AuthedShowIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +76,19 @@ export interface FileRoutesById {
   '/_authed/anime': typeof AuthedAnimeRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_authed/show/$id': typeof AuthedShowIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/addons' | '/anime' | '/settings' | '/auth/callback'
+  fullPaths:
+    | '/'
+    | '/addons'
+    | '/anime'
+    | '/settings'
+    | '/auth/callback'
+    | '/show/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/addons' | '/anime' | '/settings' | '/auth/callback'
+  to: '/' | '/addons' | '/anime' | '/settings' | '/auth/callback' | '/show/$id'
   id:
     | '__root__'
     | '/'
@@ -82,6 +97,7 @@ export interface FileRouteTypes {
     | '/_authed/anime'
     | '/_authed/settings'
     | '/auth/callback'
+    | '/_authed/show/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -134,6 +150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAddonsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/show/$id': {
+      id: '/_authed/show/$id'
+      path: '/show/$id'
+      fullPath: '/show/$id'
+      preLoaderRoute: typeof AuthedShowIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -141,12 +164,14 @@ interface AuthedRouteChildren {
   AuthedAddonsRoute: typeof AuthedAddonsRoute
   AuthedAnimeRoute: typeof AuthedAnimeRoute
   AuthedSettingsRoute: typeof AuthedSettingsRoute
+  AuthedShowIdRoute: typeof AuthedShowIdRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAddonsRoute: AuthedAddonsRoute,
   AuthedAnimeRoute: AuthedAnimeRoute,
   AuthedSettingsRoute: AuthedSettingsRoute,
+  AuthedShowIdRoute: AuthedShowIdRoute,
 }
 
 const AuthedRouteWithChildren =
