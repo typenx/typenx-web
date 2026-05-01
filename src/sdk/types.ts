@@ -157,6 +157,7 @@ export type EpisodeMetadata = {
   id: string
   anime_id: string
   number: number
+  season: number | null
   title: string | null
   synopsis: string | null
   thumbnail: string | null
