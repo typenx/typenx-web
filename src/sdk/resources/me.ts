@@ -3,6 +3,7 @@ import type {
   AnimeListEntry,
   CurrentUser,
   ProviderAccount,
+  User,
   WatchProgress,
 } from '../types'
 
@@ -11,6 +12,10 @@ export class MeResource {
 
   current() {
     return this.http.get<CurrentUser>('/me')
+  }
+
+  profile() {
+    return this.http.get<User>('/profile')
   }
 
   providers() {

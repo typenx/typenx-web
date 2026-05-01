@@ -12,7 +12,7 @@ import { ChevronsUpDown, LogOut, Puzzle, Settings, Tv } from 'lucide-react'
 import { useAuth } from '#/components/auth-provider'
 import { BrandMark } from '#/components/brand'
 import { ModeToggle } from '#/components/mode-toggle'
-import { Avatar, AvatarFallback } from '#/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,6 +152,13 @@ function UserMenu() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-7 rounded-md">
+                {user?.avatar_url ? (
+                  <AvatarImage
+                    src={user.avatar_url}
+                    alt={username}
+                    className="rounded-md"
+                  />
+                ) : null}
                 <AvatarFallback className="rounded-md text-xs">
                   {initial}
                 </AvatarFallback>

@@ -22,10 +22,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = React.useCallback(async () => {
     try {
-      const current = await typenx.me.current()
-      setUser(current.user)
+      const profile = await typenx.me.profile()
+      setUser(profile)
       setError(null)
-      return current.user
+      return profile
     } catch (err) {
       if (isTypenxApiError(err) && err.status === 401) {
         setUser(null)
