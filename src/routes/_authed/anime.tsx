@@ -1,15 +1,9 @@
 import * as React from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ChevronRight, ChevronUp, Loader2, Search } from 'lucide-react'
+import { ChevronRight, ChevronUp, Loader2, Play } from 'lucide-react'
 
-import { useAuth } from '#/components/auth-provider'
 import { cn } from '#/lib/utils'
 import { Button } from '#/components/ui/button'
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from '#/components/ui/input-group'
 import { typenx } from '#/sdk'
 import type {
   AddonRegistration,
@@ -20,7 +14,12 @@ import type {
   ProviderAccount,
 } from '#/sdk'
 
-export const Route = createFileRoute('/_authed/anime')({ component: AnimePage })
+export const Route = createFileRoute('/_authed/anime')({
+  validateSearch: (search): { q?: string } => ({
+    q: typeof search.q === 'string' ? search.q : undefined,
+  }),
+  component: AnimePage,
+})
 
 type CatalogRow = {
   addon: AddonRegistration
@@ -35,10 +34,9 @@ type WatchingShow = {
 }
 
 function AnimePage() {
-  const { user } = useAuth()
+  const { q = '' } = Route.useSearch()
   const [rows, setRows] = React.useState<CatalogRow[]>([])
   const [watching, setWatching] = React.useState<WatchingShow[]>([])
-  const [query, setQuery] = React.useState('')
   const [searchResults, setSearchResults] = React.useState<AddonSearchResult[]>(
     [],
   )
@@ -46,8 +44,7 @@ function AnimePage() {
   const [searchError, setSearchError] = React.useState<string | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const display = user?.display_name ?? 'Typenx user'
-  const trimmedQuery = query.trim()
+  const trimmedQuery = q.trim()
 
   React.useEffect(() => {
     let cancelled = false
@@ -160,61 +157,102 @@ function AnimePage() {
     }
   }, [trimmedQuery])
 
+  const featured = React.useMemo(() => {
+    if (watching.length > 0 && watching[0]) return watching[0].show
+    for (const row of rows) {
+      if (row.shows.length > 0 && row.shows[0]) return row.shows[0]
+    }
+    return null
+  }, [watching, rows])
+
   return (
-    <div className="px-6 py-8">
-      <div className="mb-6 flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          Dashboard
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back, {display}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Browse anime from your linked provider addons.
-        </p>
-      </div>
+    <div>
+      {trimmedQuery.length === 0 && <FeaturedHero show={featured} />}
 
-      <div className="mb-10">
-        <SearchBar
-          query={query}
-          onQueryChange={setQuery}
-          isSearching={isSearching}
-        />
+      <div className="px-6 pb-8 pt-8">
+        {trimmedQuery.length > 0 ? (
+          <SearchResults
+            query={trimmedQuery}
+            results={searchResults}
+            isSearching={isSearching}
+            error={searchError}
+          />
+        ) : isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading anime...</p>
+        ) : error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : rows.length === 0 && watching.length === 0 ? (
+          <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+            No anime came back from the configured addons.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-10">
+            {watching.length > 0 && <CurrentlyWatchingRow shows={watching} />}
+            {rows.map((row) => (
+              <ShowRow
+                key={row.addon.id}
+                title={`${addonName(row.addon)} Anime`}
+                caption={row.error ?? `Served by ${addonName(row.addon)}.`}
+                addonId={row.addon.id}
+                shows={row.shows}
+                isError={!!row.error}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      {trimmedQuery.length > 0 ? (
-        <SearchResults
-          query={trimmedQuery}
-          results={searchResults}
-          isSearching={isSearching}
-          error={searchError}
-        />
-      ) : isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading anime...</p>
-      ) : error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : rows.length === 0 && watching.length === 0 ? (
-        <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-          No anime came back from the configured addons.
-        </div>
-      ) : (
-        <div className="flex flex-col gap-10">
-          {watching.length > 0 && <CurrentlyWatchingRow shows={watching} />}
-          {rows.map((row) => (
-            <ShowRow
-              key={row.addon.id}
-              title={`${addonName(row.addon)} Anime`}
-              caption={row.error ?? `Served by ${addonName(row.addon)}.`}
-              addonId={row.addon.id}
-              shows={row.shows}
-              isError={!!row.error}
-            />
-          ))}
-        </div>
-      )}
     </div>
+  )
+}
+
+function FeaturedHero({ show }: { show: AnimePreview | null }) {
+  const backdrop =
+    show?.poster ??
+    `https://picsum.photos/seed/typenx-hero-${show?.id ?? 'default'}/1600/600`
+
+  return (
+    <section className="relative overflow-hidden border-b border-border">
+      <div className="absolute inset-0">
+        <img
+          src={backdrop}
+          alt=""
+          className="h-full w-full object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-4 px-6 py-14 sm:py-20">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Featured
+        </span>
+        <h1 className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
+          {show?.title ?? 'Discover what’s airing'}
+        </h1>
+        {show?.synopsis ? (
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground line-clamp-3">
+            {show.synopsis}
+          </p>
+        ) : (
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Pick up where you left off, or jump into something new from your
+            linked addons.
+          </p>
+        )}
+        {show && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="lg" asChild className="gap-2">
+              <Link to="/show/$id" params={{ id: show.id }}>
+                <Play className="fill-current" />
+                Play
+              </Link>
+            </Button>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -246,7 +284,7 @@ async function loadCurrentlyWatching(
           response.items.find(
             (item) => item.title.toLowerCase() === entry.title.toLowerCase(),
           ) ??
-          response.items[0]
+          response.items.at(0)
 
         if (!show) return null
         return { addon, entry, show }
@@ -484,30 +522,6 @@ function SearchResults({
   )
 }
 
-function SearchBar({
-  query,
-  onQueryChange,
-  isSearching,
-}: {
-  query: string
-  onQueryChange: (query: string) => void
-  isSearching: boolean
-}) {
-  return (
-    <InputGroup className="h-10 w-full max-w-xl">
-      <InputGroupAddon>
-        {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
-      </InputGroupAddon>
-      <InputGroupInput
-        type="search"
-        placeholder="Search anime..."
-        aria-label="Search anime"
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
-      />
-    </InputGroup>
-  )
-}
 
 function selectCatalogAddons(
   addons: AddonRegistration[],
@@ -519,7 +533,7 @@ function selectCatalogAddons(
       addon.manifest?.id ?? '',
     ),
   )
-  const providerOrder = providers.map((provider) =>
+  const providerOrder: string[] = providers.map((provider) =>
     provider.provider === 'anilist'
       ? 'typenx-addon-anilist'
       : 'typenx-addon-myanimelist',

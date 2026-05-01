@@ -7,7 +7,14 @@ import {
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
-import { ChevronsUpDown, LogOut, Puzzle, Settings, Tv } from 'lucide-react'
+import {
+  ChevronsUpDown,
+  LogOut,
+  Puzzle,
+  Search,
+  Settings,
+  Tv,
+} from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
 import { BrandMark } from '#/components/brand'
@@ -20,6 +27,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import { Separator } from '#/components/ui/separator'
 import { typenx } from '#/sdk'
 import {
@@ -80,9 +92,8 @@ function AuthedLayout() {
         <header className="flex h-14 items-center gap-3 border-b px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-5" />
-          <div className="ml-auto">
-            <ModeToggle />
-          </div>
+          <HeaderSearch />
+          <ModeToggle />
         </header>
         <div className="flex-1">
           <Outlet />
@@ -129,6 +140,34 @@ function AppSidebar() {
         <UserMenu />
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+function HeaderSearch() {
+  const navigate = useNavigate()
+  const [value, setValue] = React.useState('')
+
+  return (
+    <InputGroup className="ml-auto h-9 w-full max-w-md">
+      <InputGroupAddon>
+        <Search />
+      </InputGroupAddon>
+      <InputGroupInput
+        type="search"
+        placeholder="Search anime..."
+        aria-label="Search anime"
+        value={value}
+        onChange={(event) => {
+          const next = event.target.value
+          setValue(next)
+          void navigate({
+            to: '/anime',
+            search: next.trim() ? { q: next } : {},
+            replace: true,
+          })
+        }}
+      />
+    </InputGroup>
   )
 }
 
