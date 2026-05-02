@@ -1,5 +1,10 @@
 import * as React from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  notFound,
+  useNavigate,
+} from '@tanstack/react-router'
 import {
   ArrowLeft,
   Calendar,
@@ -28,105 +33,106 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import { typenx } from '#/sdk'
+import { withAuthRedirect } from '#/lib/loaders'
+import { isTypenxApiError, typenx } from '#/sdk'
 import type { AnimeMetadata, EpisodeMetadata } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/show/$id')({
-  validateSearch: (search): { addon_id?: string } => ({
+  validateSearch: (
+    search,
+  ): { addon_id?: string; season?: number } => ({
     addon_id:
       typeof search.addon_id === 'string' ? search.addon_id : undefined,
+    season:
+      typeof search.season === 'number' && Number.isFinite(search.season)
+        ? search.season
+        : undefined,
   }),
+  loaderDeps: ({ search }) => ({ addonId: search.addon_id }),
+  loader: ({ params, deps, location }) =>
+    withAuthRedirect(async () => {
+      try {
+        return await typenx.catalog.anime(params.id, deps.addonId)
+      } catch (err) {
+        if (isTypenxApiError(err) && err.status === 404) {
+          throw notFound()
+        }
+        throw err
+      }
+    }, location.href),
+  staleTime: 60_000,
+  gcTime: 30 * 60_000,
   component: ShowDetailPage,
+  pendingComponent: ShowPending,
+  errorComponent: ShowError,
+  notFoundComponent: ShowNotFound,
 })
 
 function ShowDetailPage() {
-  const { id } = Route.useParams()
-  const { addon_id: addonId } = Route.useSearch()
-  const [show, setShow] = React.useState<AnimeMetadata | null>(null)
-  const [isLoading, setIsLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    let cancelled = false
-
-    async function loadShow() {
-      try {
-        setIsLoading(true)
-        const metadata = await typenx.catalog.anime(id, addonId)
-        if (!cancelled) {
-          setShow(metadata)
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setShow(null)
-          setError(
-            err instanceof Error ? err.message : 'Unable to load show details',
-          )
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    void loadShow()
-    return () => {
-      cancelled = true
-    }
-  }, [id, addonId])
-
-  if (isLoading) {
-    return (
-      <div className="grid min-h-[50vh] place-items-center px-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading show...
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !show) {
-    return (
-      <div className="mx-auto w-full max-w-3xl px-6 py-10">
-        <Button variant="ghost" size="sm" asChild className="mb-6">
-          <Link to="/anime">
-            <ArrowLeft />
-            Back
-          </Link>
-        </Button>
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error ?? 'Show not found'}
-        </div>
-      </div>
-    )
-  }
-
+  const show = Route.useLoaderData()
   return <ShowView show={show} />
 }
 
+function ShowPending() {
+  return (
+    <div className="grid min-h-[50vh] place-items-center px-6">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading show...
+      </div>
+    </div>
+  )
+}
+
+function ShowError({ error }: { error: Error }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <Button variant="ghost" size="sm" asChild className="mb-6">
+        <Link to="/anime">
+          <ArrowLeft />
+          Back
+        </Link>
+      </Button>
+      <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        {error.message || 'Unable to load show details'}
+      </div>
+    </div>
+  )
+}
+
+function ShowNotFound() {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <Button variant="ghost" size="sm" asChild className="mb-6">
+        <Link to="/anime">
+          <ArrowLeft />
+          Back
+        </Link>
+      </Button>
+      <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        Show not found
+      </div>
+    </div>
+  )
+}
+
 function ShowView({ show }: { show: AnimeMetadata }) {
+  const navigate = useNavigate({ from: Route.fullPath })
+  const search = Route.useSearch()
   const poster = show.poster
   const banner = show.banner ?? show.poster
   const description = show.description ?? show.synopsis
-  const seasons = React.useMemo(() => groupBySeason(show.episodes), [
-    show.episodes,
-  ])
+  const seasons = React.useMemo(
+    () => groupBySeason(show.episodes),
+    [show.episodes],
+  )
   const hasMultipleSeasons = seasons.length > 1
-  const [activeSeason, setActiveSeason] = React.useState<number>(
-    seasons.at(0)?.number ?? 1,
-  )
-  const activeEpisodes = React.useMemo(
-    () =>
-      seasons.find((s) => s.number === activeSeason)?.episodes ??
-      seasons.at(0)?.episodes ??
-      [],
-    [seasons, activeSeason],
-  )
-
-  React.useEffect(() => {
-    setActiveSeason(seasons.at(0)?.number ?? 1)
-  }, [seasons])
+  const firstSeasonNumber = seasons.at(0)?.number ?? 1
+  const activeSeason = search.season ?? firstSeasonNumber
+  const activeEpisodes =
+    seasons.find((s) => s.number === activeSeason)?.episodes ??
+    seasons.at(0)?.episodes ??
+    []
 
   return (
     <div className="relative">
@@ -221,7 +227,12 @@ function ShowView({ show }: { show: AnimeMetadata }) {
               {hasMultipleSeasons && (
                 <Select
                   value={String(activeSeason)}
-                  onValueChange={(v) => setActiveSeason(Number(v))}
+                  onValueChange={(value) =>
+                    navigate({
+                      search: (prev) => ({ ...prev, season: Number(value) }),
+                      replace: true,
+                    })
+                  }
                 >
                   <SelectTrigger className="w-40">
                     <SelectValue />

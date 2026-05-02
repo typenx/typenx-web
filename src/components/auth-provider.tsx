@@ -1,14 +1,9 @@
 import * as React from 'react'
 
-import { isTypenxApiError, typenx   } from '#/sdk'
-import type {AuthProvider, User} from '#/sdk';
+import { typenx } from '#/sdk'
+import type { AuthProvider } from '#/sdk'
 
 type AuthContextValue = {
-  user: User | null
-  isAuthenticated: boolean
-  isReady: boolean
-  error: string | null
-  refresh: () => Promise<User | null>
   signIn: (provider: AuthProvider) => Promise<void>
   signUp: (provider: AuthProvider) => Promise<void>
   signOut: () => Promise<void>
@@ -17,73 +12,16 @@ type AuthContextValue = {
 const AuthContext = React.createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = React.useState<User | null>(null)
-  const [isReady, setIsReady] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const refresh = React.useCallback(async () => {
-    try {
-      const profile = await loadProfile()
-      setUser(profile)
-      setError(null)
-      return profile
-    } catch (err) {
-      if (isTypenxApiError(err) && err.status === 401) {
-        setUser(null)
-        setError(null)
-        return null
-      }
-      setUser(null)
-      setError(err instanceof Error ? err.message : 'Unable to load session')
-      return null
-    }
-  }, [])
-
-  React.useEffect(() => {
-    void refresh().finally(() => setIsReady(true))
-  }, [refresh])
-
-  const signIn = React.useCallback(async (provider: AuthProvider) => {
-    await typenx.auth.redirectToLogin(provider)
-  }, [])
-
-  const signUp = React.useCallback(async (provider: AuthProvider) => {
-    await typenx.auth.redirectToSignup(provider)
-  }, [])
-
-  const signOut = React.useCallback(async () => {
-    await typenx.auth.logout()
-    setUser(null)
-  }, [])
-
   const value = React.useMemo<AuthContextValue>(
     () => ({
-      user,
-      isAuthenticated: !!user,
-      isReady,
-      error,
-      refresh,
-      signIn,
-      signUp,
-      signOut,
+      signIn: (provider) => typenx.auth.redirectToLogin(provider),
+      signUp: (provider) => typenx.auth.redirectToSignup(provider),
+      signOut: () => typenx.auth.logout(),
     }),
-    [user, isReady, error, refresh, signIn, signUp, signOut],
+    [],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-async function loadProfile() {
-  try {
-    return await typenx.me.profile()
-  } catch (err) {
-    if (isTypenxApiError(err) && err.status === 404) {
-      const current = await typenx.me.current()
-      return current.user
-    }
-
-    throw err
-  }
 }
 
 export function useAuth() {

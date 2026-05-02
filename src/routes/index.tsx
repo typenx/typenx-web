@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
@@ -16,29 +16,23 @@ export const Route = createFileRoute('/')({
       typeof search.auth_error === 'string' ? search.auth_error : undefined,
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
   }),
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
+    if (typeof window === 'undefined') return
     try {
       await typenx.me.current()
     } catch {
       return
     }
-    throw redirect({ to: '/anime', replace: true })
+    throw redirect({ href: search.redirect ?? '/anime', replace: true })
   },
   component: LoginPage,
 })
 
 function LoginPage() {
   const [mode, setMode] = React.useState<'signin' | 'signup'>('signin')
-  const { error, isAuthenticated, isReady, signIn, signUp } = useAuth()
-  const navigate = useNavigate()
+  const { signIn, signUp } = useAuth()
   const search = Route.useSearch()
   const authErrorMessage = friendlyAuthError(search.auth_error)
-
-  React.useEffect(() => {
-    if (isReady && isAuthenticated) {
-      navigate({ to: '/anime', replace: true })
-    }
-  }, [isReady, isAuthenticated, navigate])
 
   const handleProviderAuth = (provider: AuthProvider) => {
     if (mode === 'signin') {
@@ -80,33 +74,27 @@ function LoginPage() {
           </div>
         </div>
 
-        {!isReady && (
-          <p className="text-sm text-muted-foreground">Checking session...</p>
-        )}
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as 'signin' | 'signup')}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Sign in</TabsTrigger>
+            <TabsTrigger value="signup">Sign up</TabsTrigger>
+          </TabsList>
 
-        {isReady && (
-          <Tabs
-            value={mode}
-            onValueChange={(v) => setMode(v as 'signin' | 'signup')}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
-            </TabsList>
+          <TabsContent value="signin" className="mt-6">
+            <AuthOptions mode="signin" onSelect={handleProviderAuth} />
+          </TabsContent>
+          <TabsContent value="signup" className="mt-6">
+            <AuthOptions mode="signup" onSelect={handleProviderAuth} />
+          </TabsContent>
+        </Tabs>
 
-            <TabsContent value="signin" className="mt-6">
-              <AuthOptions mode="signin" onSelect={handleProviderAuth} />
-            </TabsContent>
-            <TabsContent value="signup" className="mt-6">
-              <AuthOptions mode="signup" onSelect={handleProviderAuth} />
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {(error || authErrorMessage) && (
+        {authErrorMessage && (
           <p className="mt-4 text-center text-sm text-destructive">
-            {error ?? authErrorMessage}
+            {authErrorMessage}
           </p>
         )}
 

@@ -4,8 +4,9 @@ import {
   Outlet,
   createFileRoute,
   redirect,
-  useLocation,
+  useMatch,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
 import {
   ChevronsUpDown,
@@ -49,11 +50,13 @@ import {
 } from '#/components/ui/sidebar'
 
 export const Route = createFileRoute('/_authed')({
+  ssr: false,
   beforeLoad: async ({ location }) => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') return { user: null }
 
     try {
-      return await typenx.me.current()
+      const current = await typenx.me.current()
+      return { user: current.user }
     } catch {
       throw redirect({
         to: '/',
@@ -72,18 +75,11 @@ const NAV_ITEMS = [
 ] as const
 
 function AuthedLayout() {
-  const { isAuthenticated, isReady } = useAuth()
-  const navigate = useNavigate()
+  const router = useRouter()
 
   React.useEffect(() => {
-    if (isReady && !isAuthenticated) {
-      navigate({ to: '/', replace: true })
-    }
-  }, [isReady, isAuthenticated, navigate])
-
-  if (!isReady || !isAuthenticated) {
-    return null
-  }
+    void router.preloadRoute({ to: '/anime' })
+  }, [router])
 
   return (
     <SidebarProvider>
@@ -104,8 +100,6 @@ function AuthedLayout() {
 }
 
 function AppSidebar() {
-  const { pathname } = useLocation()
-
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="py-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center px-3">
@@ -121,16 +115,7 @@ function AppSidebar() {
           <SidebarMenu>
             {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
               <SidebarMenuItem key={to}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === to}
-                  tooltip={label}
-                >
-                  <Link to={to}>
-                    <Icon />
-                    <span>{label}</span>
-                  </Link>
-                </SidebarMenuButton>
+                <SidebarNavLink to={to} label={label} icon={Icon} />
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -143,9 +128,49 @@ function AppSidebar() {
   )
 }
 
+function SidebarNavLink({
+  to,
+  label,
+  icon: Icon,
+}: {
+  to: '/anime' | '/addons' | '/settings'
+  label: string
+  icon: React.ComponentType
+}) {
+  return (
+    <Link to={to}>
+      {({ isActive }) => (
+        <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+          <span>
+            <Icon />
+            <span>{label}</span>
+          </span>
+        </SidebarMenuButton>
+      )}
+    </Link>
+  )
+}
+
 function HeaderSearch() {
   const navigate = useNavigate()
-  const [value, setValue] = React.useState('')
+  const animeMatch = useMatch({ from: '/_authed/anime', shouldThrow: false })
+  const showMatch = useMatch({ from: '/_authed/show/$id', shouldThrow: false })
+  const initialQuery = animeMatch?.search.q ?? ''
+  const [value, setValue] = React.useState(initialQuery)
+  const debounceRef = React.useRef<number | null>(null)
+
+  React.useEffect(() => {
+    setValue(initialQuery)
+  }, [initialQuery])
+
+  React.useEffect(
+    () => () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current)
+    },
+    [],
+  )
+
+  if (!animeMatch && !showMatch) return <div className="ml-auto" />
 
   return (
     <InputGroup className="ml-auto h-9 w-full max-w-md">
@@ -160,11 +185,15 @@ function HeaderSearch() {
         onChange={(event) => {
           const next = event.target.value
           setValue(next)
-          void navigate({
-            to: '/anime',
-            search: next.trim() ? { q: next } : {},
-            replace: true,
-          })
+          if (debounceRef.current !== null)
+            window.clearTimeout(debounceRef.current)
+          debounceRef.current = window.setTimeout(() => {
+            void navigate({
+              to: '/anime',
+              search: next.trim() ? { q: next } : {},
+              replace: true,
+            })
+          }, 200)
         }}
       />
     </InputGroup>
@@ -172,12 +201,13 @@ function HeaderSearch() {
 }
 
 function UserMenu() {
-  const { user, signOut } = useAuth()
+  const { user } = Route.useRouteContext()
+  const { signOut } = useAuth()
   const navigate = useNavigate()
 
-  const handleSignOut = () => {
-    void signOut()
-    navigate({ to: '/', replace: true })
+  const handleSignOut = async () => {
+    await signOut()
+    void navigate({ to: '/', replace: true })
   }
 
   const username = user?.display_name ?? 'Typenx user'
@@ -229,7 +259,10 @@ function UserMenu() {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} variant="destructive">
+            <DropdownMenuItem
+              onClick={() => void handleSignOut()}
+              variant="destructive"
+            >
               <LogOut /> Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
