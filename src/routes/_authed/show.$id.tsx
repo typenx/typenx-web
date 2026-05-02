@@ -131,7 +131,10 @@ async function loadShowMetadata(
   contentType: 'anime' | 'manga' | undefined,
 ) {
   if (contentType === 'manga') {
-    return typenx.catalog.manga(id, addonId)
+    const selected = await typenx.catalog.manga(id, addonId)
+    return mangaNeedsChapterFallback(selected)
+      ? await loadKitsuMangaFallback(selected, addonId)
+      : selected
   }
 
   try {
@@ -141,6 +144,45 @@ async function loadShowMetadata(
       throw err
     }
     return typenx.catalog.manga(id)
+  }
+}
+
+function mangaNeedsChapterFallback(show: AnimeMetadata) {
+  return isMangaContent(show) && show.episodes.length === 0 && !positiveCount(show.episode_count)
+}
+
+async function loadKitsuMangaFallback(
+  selected: AnimeMetadata,
+  selectedAddonId: string | undefined,
+) {
+  const addons = await typenx.addons.list()
+  const kitsu = addons.find(
+    (addon) =>
+      addon.enabled &&
+      addon.id !== selectedAddonId &&
+      addon.manifest?.id === 'typenx-addon-kitsu' &&
+      addon.manifest.catalogs.some((catalog) => catalog.content_type === 'manga'),
+  )
+  if (!kitsu) return selected
+
+  try {
+    const search = await typenx.catalog.mangaSearch({
+      addon_id: kitsu.id,
+      query: selected.title,
+      content_type: 'manga',
+      limit: 5,
+    })
+    const match =
+      search.items.find((item) => sameTitle(item.title, selected.title)) ??
+      search.items[0]
+    if (!match) return selected
+
+    const fallback = await typenx.catalog.manga(match.id, kitsu.id)
+    return fallback.episodes.length > 0 || positiveCount(fallback.episode_count)
+      ? fallback
+      : selected
+  } catch {
+    return selected
   }
 }
 
@@ -271,11 +313,29 @@ function ShowView({
     })
   }
 
+  const readChapter = (chapter: EpisodeMetadata) => {
+    void rootNavigate({
+      to: '/read/$chapterId',
+      params: { chapterId: chapter.id },
+      search: {
+        manga_id: show.id,
+        manga: show.title,
+        addon_id: search.addon_id,
+        chapter: chapter.number,
+        volume:
+          chapter.season_number ?? chapter.season ?? undefined,
+        title: chapter.title ?? undefined,
+      },
+    })
+  }
+
   const playPrimary = () => {
-    if (isManga) return
-    const target = resumeEpisode ?? seasonEpisodes[0]
-    if (!target) return
-    playEpisode(target)
+    if (seasonEpisodes.length === 0) return
+    if (isManga) {
+      readChapter(seasonEpisodes[0])
+      return
+    }
+    playEpisode(resumeEpisode ?? seasonEpisodes[0])
   }
 
   return (
@@ -338,7 +398,7 @@ function ShowView({
                 <Button
                   size="lg"
                   className="gap-2"
-                  disabled={isManga || show.episodes.length === 0}
+                  disabled={show.episodes.length === 0}
                   onClick={playPrimary}
                 >
                   <Play className="fill-current" />
@@ -451,7 +511,11 @@ function ShowView({
                           episode={episode}
                           label={isManga ? 'Chapter' : 'Episode'}
                           fallbackImage={episodeFallbackImage}
-                          onPlay={isManga ? undefined : () => playEpisode(episode)}
+                          onPlay={
+                            isManga
+                              ? () => readChapter(episode)
+                              : () => playEpisode(episode)
+                          }
                         />
                       ))}
                     </ItemGroup>
@@ -835,6 +899,21 @@ function EpisodesPagination({
 
 function isMangaContent(show: AnimeMetadata) {
   return ['manga', 'manhwa', 'manhua', 'light_novel'].includes(show.content_type)
+}
+
+function positiveCount(value: number | null | undefined) {
+  return typeof value === 'number' && value > 0
+}
+
+function sameTitle(left: string, right: string) {
+  return normalizeTitle(left) === normalizeTitle(right)
+}
+
+function normalizeTitle(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 function mangaChapterRows(show: AnimeMetadata): EpisodeMetadata[] {
