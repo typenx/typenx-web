@@ -205,9 +205,14 @@ function ShowView({
   const poster = show.poster
   const episodeFallbackImage = show.poster ?? show.banner
   const description = show.description ?? show.synopsis
+  const isManga = isMangaContent(show)
+  const entries = React.useMemo(
+    () => (isManga ? mangaChapterRows(show) : show.episodes),
+    [isManga, show],
+  )
   const seasons = React.useMemo(
-    () => groupBySeason(show.episodes),
-    [show.episodes],
+    () => groupBySeason(entries),
+    [entries],
   )
   const hasSeasons = seasons.length > 0
   const hasMultipleSeasons = seasons.length > 1
@@ -219,8 +224,8 @@ function ShowView({
     []
 
   const resumeEpisode = React.useMemo(
-    () => pickResumeEpisode(show.episodes, progress),
-    [show.episodes, progress],
+    () => (isManga ? null : pickResumeEpisode(show.episodes, progress)),
+    [isManga, show.episodes, progress],
   )
   const isResuming = !!resumeEpisode
 
@@ -267,6 +272,7 @@ function ShowView({
   }
 
   const playPrimary = () => {
+    if (isManga) return
     const target = resumeEpisode ?? seasonEpisodes[0]
     if (!target) return
     playEpisode(target)
@@ -332,11 +338,11 @@ function ShowView({
                 <Button
                   size="lg"
                   className="gap-2"
-                  disabled={show.episodes.length === 0}
+                  disabled={isManga || show.episodes.length === 0}
                   onClick={playPrimary}
                 >
                   <Play className="fill-current" />
-                  {isResuming
+                  {isManga ? 'Start Reading' : isResuming
                     ? `Continue Watching${
                         resumeEpisode?.number
                           ? ` · Ep ${resumeEpisode.number}`
@@ -363,9 +369,11 @@ function ShowView({
           <Tabs defaultValue="episodes" className="w-full">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="episodes">Episodes</TabsTrigger>
-              <TabsTrigger value="characters">Characters</TabsTrigger>
-              <TabsTrigger value="related">Related</TabsTrigger>
+              <TabsTrigger value="episodes">
+                {isManga ? 'Chapters' : 'Episodes'}
+              </TabsTrigger>
+              {!isManga && <TabsTrigger value="characters">Characters</TabsTrigger>}
+              {!isManga && <TabsTrigger value="related">Related</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="overview" className="mt-4">
@@ -378,8 +386,8 @@ function ShowView({
                   <div>
                     <p className="text-xs text-muted-foreground">
                       {hasMultipleSeasons
-                        ? `${activeEpisodes.length} in season ${activeSeason} · ${show.episodes.length} total`
-                        : `${show.episodes.length} total`}
+                        ? `${activeEpisodes.length} in season ${activeSeason} · ${entries.length} total`
+                        : `${entries.length} total`}
                       {totalPages > 1 &&
                         ` · page ${currentPage} of ${totalPages}`}
                     </p>
@@ -441,8 +449,9 @@ function ShowView({
                         <EpisodeRow
                           key={episode.id}
                           episode={episode}
+                          label={isManga ? 'Chapter' : 'Episode'}
                           fallbackImage={episodeFallbackImage}
-                          onPlay={() => playEpisode(episode)}
+                          onPlay={isManga ? undefined : () => playEpisode(episode)}
                         />
                       ))}
                     </ItemGroup>
@@ -456,26 +465,30 @@ function ShowView({
                   </>
                 ) : (
                   <div className="rounded-xl border border-border bg-card/40 px-4 py-8 text-center text-sm text-muted-foreground">
-                    No episode metadata is available from this addon.
+                    No {isManga ? 'chapter' : 'episode'} metadata is available from this addon.
                   </div>
                 )}
               </section>
             </TabsContent>
 
-            <TabsContent value="characters" className="mt-4">
-              <CharactersTab staff={show.staff} />
-            </TabsContent>
+            {!isManga && (
+              <TabsContent value="characters" className="mt-4">
+                <CharactersTab staff={show.staff} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="related" className="mt-4">
-              <RelatedTab show={show} />
-            </TabsContent>
+            {!isManga && (
+              <TabsContent value="related" className="mt-4">
+                <RelatedTab show={show} />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 
         <aside className="flex flex-col gap-4">
           <InfoCard show={show} seasonsCount={seasons.length} />
-          {show.staff.length > 0 && <CastCard staff={show.staff} />}
-          {show.external_links.length > 0 && (
+          {!isManga && show.staff.length > 0 && <CastCard staff={show.staff} />}
+          {!isManga && show.external_links.length > 0 && (
             <LinksCard links={show.external_links} />
           )}
         </aside>
@@ -635,20 +648,18 @@ function InfoCard({
   show: AnimeMetadata
   seasonsCount: number
 }) {
+  const isManga = isMangaContent(show)
   const rows: Array<[string, string | null]> = [
-    ['Seasons', seasonsCount > 0 ? String(seasonsCount) : null],
+    ['Seasons', !isManga && seasonsCount > 0 ? String(seasonsCount) : null],
     [
-      'Episodes',
+      isManga ? 'Chapters' : 'Episodes',
       show.episode_count
         ? String(show.episode_count)
         : show.episodes.length
           ? String(show.episodes.length)
           : null,
     ],
-    [
-      'Duration',
-      show.duration_minutes ? `${show.duration_minutes}m` : null,
-    ],
+    ['Duration', !isManga && show.duration_minutes ? `${show.duration_minutes}m` : null],
     ['Type', formatValue(show.content_type)],
     ['Source', formatValue(show.source)],
     ['Country', show.country_of_origin],
@@ -801,6 +812,35 @@ function EpisodesPagination({
   )
 }
 
+function isMangaContent(show: AnimeMetadata) {
+  return ['manga', 'manhwa', 'manhua', 'light_novel'].includes(show.content_type)
+}
+
+function mangaChapterRows(show: AnimeMetadata): EpisodeMetadata[] {
+  if (show.episodes.length > 0) return show.episodes
+  const count =
+    typeof show.episode_count === 'number' && show.episode_count > 0
+      ? Math.floor(show.episode_count)
+      : 0
+
+  return Array.from({ length: count }, (_, index) => {
+    const number = index + 1
+    return {
+      id: `${show.id}:chapter:${number}`,
+      anime_id: show.id,
+      season_number: null,
+      season: null,
+      number,
+      title: `Chapter ${number}`,
+      synopsis: null,
+      thumbnail: show.poster ?? show.banner,
+      duration_minutes: null,
+      source: 'Provider chapter count',
+      aired_at: null,
+    }
+  })
+}
+
 function visiblePages(
   current: number,
   total: number,
@@ -820,56 +860,73 @@ function visiblePages(
 
 function EpisodeRow({
   episode,
+  label = 'Episode',
   fallbackImage,
   onPlay,
 }: {
   episode: EpisodeMetadata
+  label?: 'Episode' | 'Chapter'
   fallbackImage?: string | null
-  onPlay: () => void
+  onPlay?: () => void
 }) {
   const thumbnail = episode.thumbnail ?? fallbackImage
+  const content = (
+    <>
+      <ItemMedia>
+        {thumbnail ? (
+          <img
+            src={thumbnail}
+            alt=""
+            className="size-14 rounded-md object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-sm font-semibold text-muted-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+            {episode.number}
+          </div>
+        )}
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle>
+          {episode.title ?? `${label} ${episode.number}`}
+        </ItemTitle>
+        <ItemDescription className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3" />
+            {formatDate(episode.aired_at) ?? `Unknown ${label.toLowerCase()} date`}
+          </span>
+          {episode.duration_minutes && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3" />
+              {episode.duration_minutes} min
+            </span>
+          )}
+          {episode.source && (
+            <span className="inline-flex items-center gap-1">
+              <Users className="size-3" />
+              {episode.source}
+            </span>
+          )}
+        </ItemDescription>
+      </ItemContent>
+      {onPlay && (
+        <Play className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+      )}
+    </>
+  )
+
+  if (!onPlay) {
+    return (
+      <Item variant="outline" className="group">
+        {content}
+      </Item>
+    )
+  }
 
   return (
     <Item asChild variant="outline" className="group cursor-pointer">
       <button type="button" onClick={onPlay}>
-        <ItemMedia>
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt=""
-              className="size-14 rounded-md object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-sm font-semibold text-muted-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              {episode.number}
-            </div>
-          )}
-        </ItemMedia>
-        <ItemContent>
-          <ItemTitle>
-            {episode.title ?? `Episode ${episode.number}`}
-          </ItemTitle>
-          <ItemDescription className="flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="size-3" />
-              {formatDate(episode.aired_at) ?? 'Unknown air date'}
-            </span>
-            {episode.duration_minutes && (
-              <span className="inline-flex items-center gap-1">
-                <Clock className="size-3" />
-                {episode.duration_minutes} min
-              </span>
-            )}
-            {episode.source && (
-              <span className="inline-flex items-center gap-1">
-                <Users className="size-3" />
-                {episode.source}
-              </span>
-            )}
-          </ItemDescription>
-        </ItemContent>
-        <Play className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+        {content}
       </button>
     </Item>
   )
