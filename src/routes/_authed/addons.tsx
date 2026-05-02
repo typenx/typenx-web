@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Loader2, Plus, Puzzle, Trash2 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
@@ -7,37 +7,26 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Separator } from '#/components/ui/separator'
-import { isTypenxApiError, typenx  } from '#/sdk'
-import type {AddonRegistration} from '#/sdk';
+import { withAuthRedirect } from '#/lib/loaders'
+import { isTypenxApiError, typenx } from '#/sdk'
+import type { AddonRegistration } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/addons')({
+  loader: ({ location }) =>
+    withAuthRedirect(() => typenx.addons.list(), location.href),
+  staleTime: 60_000,
   component: AddonsPage,
+  pendingComponent: AddonsPending,
+  errorComponent: AddonsError,
 })
 
 function AddonsPage() {
-  const [addons, setAddons] = React.useState<AddonRegistration[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
+  const router = useRouter()
+  const addons = Route.useLoaderData()
 
   const [baseUrl, setBaseUrl] = React.useState('')
   const [isSubmitting, setIsSubmitting] = React.useState(false)
-
-  const load = React.useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const list = await typenx.addons.list()
-      setAddons(list)
-    } catch (err) {
-      setError(messageFor(err))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    void load()
-  }, [load])
+  const [error, setError] = React.useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -47,9 +36,11 @@ function AddonsPage() {
     setIsSubmitting(true)
     setError(null)
     try {
-      const registered = await typenx.addons.register({ base_url: trimmed })
-      setAddons((prev) => upsert(prev, registered))
+      await typenx.addons.register({ base_url: trimmed })
       setBaseUrl('')
+      await router.invalidate({
+        filter: (m) => m.routeId === '/_authed/addons',
+      })
     } catch (err) {
       setError(messageFor(err))
     } finally {
@@ -63,7 +54,9 @@ function AddonsPage() {
     setError(null)
     try {
       await typenx.addons.delete(addon.id)
-      setAddons((prev) => prev.filter((item) => item.id !== addon.id))
+      await router.invalidate({
+        filter: (m) => m.routeId === '/_authed/addons',
+      })
     } catch (err) {
       setError(messageFor(err))
     }
@@ -119,12 +112,7 @@ function AddonsPage() {
           </span>
         </div>
 
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading addons...
-          </div>
-        ) : addons.length === 0 ? (
+        {addons.length === 0 ? (
           <EmptyState />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -138,6 +126,25 @@ function AddonsPage() {
           </ul>
         )}
       </section>
+    </div>
+  )
+}
+
+function AddonsPending() {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading addons...
+      </div>
+    </div>
+  )
+}
+
+function AddonsError({ error }: { error: Error }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <p className="text-sm text-destructive">{messageFor(error)}</p>
     </div>
   )
 }
@@ -213,14 +220,6 @@ function EmptyState() {
       </p>
     </div>
   )
-}
-
-function upsert(list: AddonRegistration[], next: AddonRegistration) {
-  const idx = list.findIndex((a) => a.id === next.id)
-  if (idx === -1) return [next, ...list]
-  const copy = list.slice()
-  copy[idx] = next
-  return copy
 }
 
 function hostnameOf(url: string) {

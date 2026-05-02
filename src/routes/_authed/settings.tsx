@@ -1,11 +1,12 @@
-import * as React from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Loader2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { friendlyAuthError } from '#/lib/auth-errors'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Separator } from '#/components/ui/separator'
+import { withAuthRedirect } from '#/lib/loaders'
 import { typenx } from '#/sdk'
 import type { AddonRegistration, AuthProvider, ProviderAccount } from '#/sdk'
 
@@ -16,7 +17,18 @@ export const Route = createFileRoute('/_authed/settings')({
         ? search.account_error
         : undefined,
   }),
+  loader: ({ location }) =>
+    withAuthRedirect(async () => {
+      const [addons, providers] = await Promise.all([
+        typenx.addons.list(),
+        typenx.me.providers(),
+      ])
+      return { addons, providers }
+    }, location.href),
+  staleTime: 60_000,
   component: SettingsPage,
+  pendingComponent: SettingsPending,
+  errorComponent: SettingsError,
 })
 
 const THEMES = [
@@ -26,47 +38,11 @@ const THEMES = [
 ] as const
 
 function SettingsPage() {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const search = Route.useSearch()
+  const { addons, providers } = Route.useLoaderData()
   const accountErrorMessage = friendlyAuthError(search.account_error)
-  const [addons, setAddons] = React.useState<AddonRegistration[]>([])
-  const [addonsError, setAddonsError] = React.useState<string | null>(null)
-  const [providers, setProviders] = React.useState<ProviderAccount[]>([])
-  const [providersError, setProvidersError] = React.useState<string | null>(
-    null,
-  )
-
-  const loadAddons = React.useCallback(async () => {
-    try {
-      const next = await typenx.addons.list()
-      setAddons(next)
-      setAddonsError(null)
-    } catch (err) {
-      setAddonsError(
-        err instanceof Error ? err.message : 'Unable to load addons',
-      )
-    }
-  }, [])
-
-  React.useEffect(() => {
-    void loadAddons()
-  }, [loadAddons])
-
-  const loadProviders = React.useCallback(async () => {
-    try {
-      const next = await typenx.me.providers()
-      setProviders(next)
-      setProvidersError(null)
-    } catch (err) {
-      setProvidersError(
-        err instanceof Error ? err.message : 'Unable to load linked accounts',
-      )
-    }
-  }, [])
-
-  React.useEffect(() => {
-    void loadProviders()
-  }, [loadProviders])
 
   const handleConnectProvider = (provider: AuthProvider) => {
     void typenx.auth.redirectToLink(provider)
@@ -74,7 +50,7 @@ function SettingsPage() {
 
   const handleDeleteAddon = (addon: AddonRegistration) => {
     if (!addon.deletable) return
-    void typenx.addons.delete(addon.id).then(loadAddons)
+    void typenx.addons.delete(addon.id).then(() => router.invalidate())
   }
 
   return (
@@ -128,12 +104,6 @@ function SettingsPage() {
           </p>
         )}
 
-        {providersError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {providersError}
-          </p>
-        )}
-
         <div className="flex flex-col gap-3">
           {TRACKING_PROVIDERS.map((provider) => (
             <ProviderItem
@@ -158,12 +128,6 @@ function SettingsPage() {
           </p>
         </div>
 
-        {addonsError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {addonsError}
-          </p>
-        )}
-
         <div className="flex flex-col gap-3">
           {addons.map((addon) => (
             <AddonItem
@@ -172,13 +136,34 @@ function SettingsPage() {
               onDelete={() => handleDeleteAddon(addon)}
             />
           ))}
-          {addons.length === 0 && !addonsError && (
+          {addons.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No addons are currently configured.
             </p>
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+function SettingsPending() {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-6 py-10">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading settings...
+      </div>
+    </div>
+  )
+}
+
+function SettingsError({ error }: { error: Error }) {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-6 py-10">
+      <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {error.message}
+      </p>
     </div>
   )
 }
