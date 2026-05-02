@@ -4,6 +4,7 @@ import type {
   AddonRegistration,
   AddonSearchResult,
   AnimeListEntry,
+  AnimeMetadata,
   AnimePreview,
   AuthProvider,
   ProviderAccount,
@@ -21,9 +22,16 @@ export type WatchingShow = {
   show: AnimePreview
 }
 
+export type FeaturedShowDetails = {
+  addon: AddonRegistration
+  show: AnimePreview
+  metadata: AnimeMetadata | null
+}
+
 export type AnimeCatalogData = {
   rows: CatalogRow[]
   watching: WatchingShow[]
+  featured: FeaturedShowDetails | null
 }
 
 const OFFICIAL_ADDON_IDS = [
@@ -64,7 +72,39 @@ export async function loadAnimeCatalog(): Promise<AnimeCatalogData> {
     ),
     loadCurrentlyWatching(library, selectedAddons),
   ])
-  return { rows, watching }
+  const featured = await loadFeaturedDetails(rows, watching)
+  return { rows, watching, featured }
+}
+
+async function loadFeaturedDetails(
+  rows: CatalogRow[],
+  watching: WatchingShow[],
+): Promise<FeaturedShowDetails | null> {
+  const pick = pickFeatured(rows, watching)
+  if (!pick) return null
+
+  try {
+    const metadata = await typenx.catalog.anime(pick.show.id, pick.addon.id)
+    return { ...pick, metadata }
+  } catch {
+    return { ...pick, metadata: null }
+  }
+}
+
+function pickFeatured(
+  rows: CatalogRow[],
+  watching: WatchingShow[],
+): { addon: AddonRegistration; show: AnimePreview } | null {
+  if (watching.length > 0) {
+    const firstWatching = watching[0]
+    return { addon: firstWatching.addon, show: firstWatching.show }
+  }
+  for (const row of rows) {
+    if (row.shows.length > 0) {
+      return { addon: row.addon, show: row.shows[0] }
+    }
+  }
+  return null
 }
 
 export async function searchAnimeCatalog(
