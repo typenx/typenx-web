@@ -1,8 +1,16 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Loader2, Play, Server } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { VideoPlayer } from '#/components/custom/video-player'
 import type {
   AudioOption,
@@ -15,7 +23,7 @@ import {
   saveGuestProgress,
 } from '#/lib/guest'
 import { typenx } from '#/sdk'
-import type { AddonRegistration, WatchProgress } from '#/sdk'
+import type { AddonRegistration, VideoStream, WatchProgress } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/watch/$id')({
   validateSearch: (
@@ -135,6 +143,9 @@ function WatchPage() {
   const [databaseProgress, setDatabaseProgress] =
     React.useState<WatchProgress | null>(null)
   const [qualities, setQualities] = React.useState<Array<QualityOption>>([])
+  const [streams, setStreams] = React.useState<Array<VideoStream>>([])
+  const [selectedSourceIndex, setSelectedSourceIndex] =
+    React.useState<number | null>(null)
   const [isLoadingVideo, setIsLoadingVideo] = React.useState(true)
   const [videoError, setVideoError] = React.useState<string | null>(null)
   const [sourceSubtitles, setSourceSubtitles] = React.useState<Array<SubtitleCountry>>([])
@@ -160,6 +171,8 @@ function WatchPage() {
         if (!addon) {
           setVideoError('No video source addon is enabled.')
           setQualities([])
+          setStreams([])
+          setSelectedSourceIndex(null)
           setSourceSubtitles([])
           return
         }
@@ -178,22 +191,23 @@ function WatchPage() {
         if (response.streams.length === 0) {
           setVideoError(`${addon.manifest?.name ?? 'Video addon'} returned no streams.`)
           setQualities([])
+          setStreams([])
+          setSelectedSourceIndex(null)
           setSourceSubtitles([])
           return
         }
 
-        setQualities(
-          response.streams.map((stream, index) => ({
-            label: stream.quality ?? stream.title ?? `Source ${index + 1}`,
-            url: stream.url,
-          })),
-        )
+        setStreams(response.streams)
+        setQualities(toQualityOptions(response.streams))
+        setSelectedSourceIndex(null)
         setSourceSubtitles(toSubtitleCountries(response.subtitles ?? []))
         setVideoError(null)
       } catch (err) {
         if (!cancelled) {
           setVideoError(err instanceof Error ? err.message : 'Unable to load video source.')
           setQualities([])
+          setStreams([])
+          setSelectedSourceIndex(null)
           setSourceSubtitles([])
         }
       } finally {
@@ -334,10 +348,75 @@ function WatchPage() {
     )
   }
 
+  if (selectedSourceIndex === null) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black px-6 text-white">
+        <Button
+          variant="ghost"
+          className="absolute left-4 top-4 text-white hover:bg-white/15 hover:text-white"
+          onClick={handleClose}
+        >
+          <ArrowLeft />
+          Back
+        </Button>
+        <div className="flex w-full max-w-xl flex-col items-center gap-5 text-center">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-[0.2em] text-white/50">
+              {showLabel}
+            </p>
+            <h1 className="text-2xl font-semibold text-white">
+              {episodeLabel}
+            </h1>
+            <p className="text-sm text-white/65">
+              {streams.length} source{streams.length === 1 ? '' : 's'} found
+            </p>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="lg"
+                className="min-w-64 gap-2 bg-white text-black hover:bg-white/90"
+              >
+                <Play className="fill-current" />
+                Play episode
+                <ChevronDown className="ml-auto size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="center"
+              className="w-96 max-w-[calc(100vw-2rem)]"
+            >
+              <DropdownMenuLabel>Choose source</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {streams.map((stream, index) => (
+                <DropdownMenuItem
+                  key={stream.id}
+                  className="flex cursor-pointer items-start gap-3 py-2"
+                  onClick={() => setSelectedSourceIndex(index)}
+                >
+                  <Server className="mt-0.5 size-4 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {sourceDisplayTitle(stream, index)}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {sourceMeta(stream)}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <VideoPlayer
       qualities={qualities}
-      defaultQualityIndex={0}
+      defaultQualityIndex={selectedSourceIndex}
       audioTracks={AUDIO_TRACKS}
       defaultAudioId="jpn"
       subtitleCountries={[...sourceSubtitles, ...subtitleCountries]}
@@ -349,6 +428,27 @@ function WatchPage() {
       onClose={handleClose}
     />
   )
+}
+
+function toQualityOptions(streams: VideoStream[]): Array<QualityOption> {
+  return streams.map((stream, index) => ({
+    label: sourceDisplayTitle(stream, index),
+    url: stream.url,
+  }))
+}
+
+function sourceDisplayTitle(stream: VideoStream, index: number) {
+  return stream.title ?? stream.quality ?? `Source ${index + 1}`
+}
+
+function sourceMeta(stream: VideoStream) {
+  return [
+    stream.quality,
+    stream.format?.toUpperCase(),
+    stream.audio_language,
+  ]
+    .filter(Boolean)
+    .join(' / ') || 'Video source'
 }
 
 function pickVideoAddon(addons: AddonRegistration[]) {
