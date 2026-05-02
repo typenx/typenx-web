@@ -60,12 +60,14 @@ export const Route = createFileRoute('/_authed/show/$id')({
     search,
   ): {
     addon_id?: string
+    content_type?: 'anime' | 'manga'
     season?: number
     page?: number
     order?: 'asc' | 'desc'
   } => ({
     addon_id:
       typeof search.addon_id === 'string' ? search.addon_id : undefined,
+    content_type: search.content_type === 'manga' ? 'manga' : undefined,
     season:
       typeof search.season === 'number' && Number.isFinite(search.season)
         ? search.season
@@ -76,13 +78,16 @@ export const Route = createFileRoute('/_authed/show/$id')({
         : undefined,
     order: search.order === 'desc' ? 'desc' : undefined,
   }),
-  loaderDeps: ({ search }) => ({ addonId: search.addon_id }),
+  loaderDeps: ({ search }) => ({
+    addonId: search.addon_id,
+    contentType: search.content_type,
+  }),
   loader: ({ params, deps, location }) =>
     withAuthRedirect(async (): Promise<ShowLoaderData> => {
       try {
         const guest = isGuestMode()
         const [show, progress] = await Promise.all([
-          typenx.catalog.anime(params.id, deps.addonId),
+          loadShowMetadata(params.id, deps.addonId, deps.contentType),
           guest
             ? Promise.resolve<WatchProgress[]>(
                 getGuestProgressForAnime(params.id).map((row) => ({
@@ -119,6 +124,25 @@ export const Route = createFileRoute('/_authed/show/$id')({
   errorComponent: ShowError,
   notFoundComponent: ShowNotFound,
 })
+
+async function loadShowMetadata(
+  id: string,
+  addonId: string | undefined,
+  contentType: 'anime' | 'manga' | undefined,
+) {
+  if (contentType === 'manga') {
+    return typenx.catalog.manga(id, addonId)
+  }
+
+  try {
+    return await typenx.catalog.anime(id, addonId)
+  } catch (err) {
+    if (addonId || (isTypenxApiError(err) && err.status === 404)) {
+      throw err
+    }
+    return typenx.catalog.manga(id)
+  }
+}
 
 function ShowDetailPage() {
   const { show, progress } = Route.useLoaderData()

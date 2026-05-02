@@ -108,6 +108,7 @@ function MangaPage() {
               key={row.addon.id}
               title={addonName(row.addon)}
               shows={row.shows}
+              addonId={row.addon.id}
               error={row.error}
             />
           ))}
@@ -161,10 +162,12 @@ function MangaShell({ children }: { children: React.ReactNode }) {
 function MangaRow({
   title,
   shows,
+  addonId,
   error,
 }: {
   title: string
   shows: AnimePreview[]
+  addonId: string
   error: string | null
 }) {
   return (
@@ -176,7 +179,7 @@ function MangaRow({
       {error ? (
         <p className="text-sm text-muted-foreground">{error}</p>
       ) : shows.length > 0 ? (
-        <MangaGrid shows={shows} />
+        <MangaGrid shows={shows} addonId={addonId} />
       ) : (
         <p className="text-sm text-muted-foreground">
           This addon did not return manga for its default catalog.
@@ -205,7 +208,7 @@ function SearchResults({
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {!error && results.length > 0 ? (
-        <MangaGrid shows={results.map((result) => result.item)} />
+        <MangaSearchGrid results={results} />
       ) : null}
       {!error && !isSearching && results.length === 0 ? (
         <p className="text-sm text-muted-foreground">No manga results found.</p>
@@ -214,39 +217,71 @@ function SearchResults({
   )
 }
 
-function MangaGrid({ shows }: { shows: AnimePreview[] }) {
+function MangaGrid({
+  shows,
+  addonId,
+}: {
+  shows: AnimePreview[]
+  addonId: string
+}) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {shows.map((show) => (
-        <Link
-          key={show.id}
-          to="/show/$id"
-          params={{ id: show.id }}
-          className="group min-w-0"
-        >
-          <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
-            {show.poster ? (
-              <img
-                src={show.poster}
-                alt=""
-                className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
-                loading="lazy"
-              />
-            ) : (
-              <div className="grid size-full place-items-center text-muted-foreground">
-                <BookOpen className="size-8" />
-              </div>
-            )}
-          </div>
-          <div className="mt-2 min-w-0">
-            <p className="truncate text-sm font-medium">{show.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {show.year ?? show.content_type.replace('_', ' ')}
-            </p>
-          </div>
-        </Link>
+        <MangaCard key={show.id} show={show} addonId={addonId} />
       ))}
     </div>
+  )
+}
+
+function MangaSearchGrid({ results }: { results: AddonSearchResult[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      {results.map((result) => (
+        <MangaCard
+          key={`${result.addon.id}:${result.item.id}`}
+          show={result.item}
+          addonId={result.addon.id}
+        />
+      ))}
+    </div>
+  )
+}
+
+function MangaCard({
+  show,
+  addonId,
+}: {
+  show: AnimePreview
+  addonId: string
+}) {
+  return (
+    <Link
+      to="/show/$id"
+      params={{ id: show.id }}
+      search={{ addon_id: addonId, content_type: 'manga' }}
+      className="group min-w-0"
+    >
+      <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
+        {show.poster ? (
+          <img
+            src={show.poster}
+            alt=""
+            className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="grid size-full place-items-center text-muted-foreground">
+            <BookOpen className="size-8" />
+          </div>
+        )}
+      </div>
+      <div className="mt-2 min-w-0">
+        <p className="truncate text-sm font-medium">{show.title}</p>
+        <p className="text-xs text-muted-foreground">
+          {show.year ?? show.content_type.replace('_', ' ')}
+        </p>
+      </div>
+    </Link>
   )
 }
 
