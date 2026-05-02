@@ -503,7 +503,7 @@ function SearchResults({
   if (query.length < 2) {
     return (
       <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-        Keep typing to search AniList and MyAnimeList.
+        Keep typing to search AniList, MyAnimeList, and Kitsu.
       </div>
     )
   }
@@ -520,7 +520,7 @@ function SearchResults({
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Searching AniList and MyAnimeList...
+        Searching AniList, MyAnimeList, and Kitsu...
       </div>
     )
   }
@@ -541,7 +541,7 @@ function SearchResults({
             Search results
           </h2>
           <p className="text-xs text-muted-foreground">
-            {results.length} matches across AniList and MyAnimeList
+            {results.length} matches across AniList, MyAnimeList, and Kitsu
           </p>
         </div>
         {isSearching && (
@@ -570,7 +570,11 @@ function selectCatalogAddons(
 ) {
   const enabled = addons.filter((addon) => addon.enabled)
   const official = enabled.filter((addon) =>
-    ['typenx-addon-anilist', 'typenx-addon-myanimelist'].includes(
+    [
+      'typenx-addon-anilist',
+      'typenx-addon-myanimelist',
+      'typenx-addon-kitsu',
+    ].includes(
       addon.manifest?.id ?? '',
     ),
   )

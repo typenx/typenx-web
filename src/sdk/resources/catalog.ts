@@ -25,7 +25,11 @@ export class CatalogResource {
     const addons = await this.http.get<AddonRegistration[]>('/addons')
     const enabled = addons.filter((addon) => addon.enabled)
     const official = enabled.filter((addon) =>
-      ['typenx-addon-anilist', 'typenx-addon-myanimelist'].includes(
+      [
+        'typenx-addon-anilist',
+        'typenx-addon-myanimelist',
+        'typenx-addon-kitsu',
+      ].includes(
         addon.manifest?.id ?? '',
       ),
     )
