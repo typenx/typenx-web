@@ -163,6 +163,7 @@ export type AnimePreview = {
   score?: number | null
   year: number | null
   content_type: ContentType
+  genres?: string[]
   season_entries?: SeasonEntry[]
 }
 

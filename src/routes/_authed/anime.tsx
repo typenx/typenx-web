@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   ChevronLeft,
   ChevronRight,
@@ -54,16 +54,28 @@ const GENRES = [
 ] as const
 
 function AnimePage() {
-  const { q = '' } = Route.useSearch()
+  const { q = '', genre } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const data = Route.useLoaderData()
   const trimmedQuery = q.trim()
+  const activeGenre = isKnownGenre(genre) ? genre : 'All Genres'
+  const filteredRows = React.useMemo(
+    () => filterRowsByGenre(data.rows, activeGenre),
+    [data.rows, activeGenre],
+  )
+  const filteredWatching = React.useMemo(
+    () => filterWatchingByGenre(data.watching, activeGenre),
+    [data.watching, activeGenre],
+  )
+  const hasVisibleShows =
+    filteredWatching.length > 0 ||
+    filteredRows.some((row) => row.error || row.shows.length > 0)
 
   const [searchResults, setSearchResults] = React.useState<AddonSearchResult[]>(
     [],
   )
   const [isSearching, setIsSearching] = React.useState(false)
   const [searchError, setSearchError] = React.useState<string | null>(null)
-  const [activeGenre, setActiveGenre] = React.useState<string>('All Genres')
 
   React.useEffect(() => {
     let cancelled = false
@@ -130,21 +142,70 @@ function AnimePage() {
     <div className="flex flex-col gap-6 px-6 py-6">
       <FeaturedHero featured={data.featured} />
 
-      <GenreRow active={activeGenre} onSelect={setActiveGenre} />
+      <GenreRow
+        active={activeGenre}
+        onSelect={(nextGenre) =>
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              genre: nextGenre === 'All Genres' ? undefined : nextGenre,
+            }),
+            replace: true,
+          })
+        }
+      />
 
       <div className="flex flex-col gap-8">
-        {data.watching.length > 0 && (
+        {filteredWatching.length > 0 && (
           <CardRow
-            title="Continue watching"
-            shows={data.watching.map(({ addon, show }) => ({ addon, show }))}
+            title={
+              activeGenre === 'All Genres'
+                ? 'Continue watching'
+                : `Continue watching ${activeGenre}`
+            }
+            shows={filteredWatching.map(({ addon, show }) => ({ addon, show }))}
           />
         )}
-        {data.rows.map((row) => (
+        {!hasVisibleShows && (
+          <div className="rounded-lg border bg-card/30 px-4 py-3 text-sm text-muted-foreground">
+            No {activeGenre} anime came back from the configured addons.
+          </div>
+        )}
+        {filteredRows.map((row) => (
           <AddonCardRow key={row.addon.id} row={row} />
         ))}
       </div>
     </div>
   )
+}
+
+function isKnownGenre(value: string | undefined): value is (typeof GENRES)[number] {
+  return GENRES.some((genre) => genre === value)
+}
+
+function filterRowsByGenre(rows: CatalogRow[], genre: string): CatalogRow[] {
+  if (genre === 'All Genres') return rows
+  return rows.map((row) => ({
+    ...row,
+    shows: row.shows.filter((show) => hasGenre(show, genre)),
+  }))
+}
+
+function filterWatchingByGenre(
+  shows: WatchingShow[],
+  genre: string,
+): WatchingShow[] {
+  if (genre === 'All Genres') return shows
+  return shows.filter(({ show }) => hasGenre(show, genre))
+}
+
+function hasGenre(show: AnimePreview, genre: string) {
+  const target = normalizeGenre(genre)
+  return (show.genres ?? []).some((item) => normalizeGenre(item) === target)
+}
+
+function normalizeGenre(value: string) {
+  return value.trim().toLowerCase().replaceAll(/[\s_-]+/g, ' ')
 }
 
 function AnimePending() {
