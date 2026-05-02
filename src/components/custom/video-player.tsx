@@ -110,6 +110,8 @@ export function VideoPlayer({
 
   const hideTimerRef = React.useRef<number | null>(null)
   const lastProgressRef = React.useRef(0)
+  const onProgressRef = React.useRef(onProgress)
+  const appliedInitialTimeRef = React.useRef(0)
 
   const activeQuality = qualities[qualityIndex]
 
@@ -125,6 +127,10 @@ export function VideoPlayer({
 
   const activeSubtitle = subtitleId ? allSubtitles.get(subtitleId) : null
   const activeAudio = audioTracks.find((t) => t.id === audioId)
+
+  React.useEffect(() => {
+    onProgressRef.current = onProgress
+  }, [onProgress])
 
   React.useEffect(() => {
     const video = videoRef.current
@@ -148,6 +154,16 @@ export function VideoPlayer({
     video.volume = volume
     video.muted = muted
   }, [volume, muted])
+
+  React.useEffect(() => {
+    const video = videoRef.current
+    if (!video || initialTime <= 0) return
+    if (appliedInitialTimeRef.current === initialTime) return
+    if (video.currentTime > 3) return
+    video.currentTime = initialTime
+    setCurrentTime(initialTime)
+    appliedInitialTimeRef.current = initialTime
+  }, [initialTime])
 
   React.useEffect(() => {
     const onChange = () =>
@@ -270,7 +286,7 @@ export function VideoPlayer({
 
   const emitProgress = (video: HTMLVideoElement, completed: boolean) => {
     lastProgressRef.current = video.currentTime
-    onProgress?.({
+    onProgressRef.current?.({
       position_seconds: Math.max(0, Math.floor(video.currentTime)),
       duration_seconds: Number.isFinite(video.duration)
         ? Math.floor(video.duration)
@@ -278,6 +294,22 @@ export function VideoPlayer({
       completed,
     })
   }
+
+  React.useEffect(() => {
+    const flushProgress = () => {
+      const video = videoRef.current
+      if (!video || video.currentTime <= 0) return
+      emitProgress(video, video.ended)
+    }
+
+    window.addEventListener('pagehide', flushProgress)
+    document.addEventListener('visibilitychange', flushProgress)
+    return () => {
+      flushProgress()
+      window.removeEventListener('pagehide', flushProgress)
+      document.removeEventListener('visibilitychange', flushProgress)
+    }
+  }, [])
 
   const VolumeIcon =
     muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
@@ -310,7 +342,11 @@ export function VideoPlayer({
         onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
         onLoadedMetadata={(e) => {
           setDuration(e.currentTarget.duration || 0)
-          if (initialTime > 0) e.currentTarget.currentTime = initialTime
+          if (initialTime > 0) {
+            e.currentTarget.currentTime = initialTime
+            setCurrentTime(initialTime)
+            appliedInitialTimeRef.current = initialTime
+          }
         }}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
@@ -385,6 +421,8 @@ export function VideoPlayer({
             onScrubEnd={(v) => {
               setScrubbing(false)
               seekTo(v)
+              const video = videoRef.current
+              if (video) emitProgress(video, false)
             }}
           />
 

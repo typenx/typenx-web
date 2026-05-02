@@ -13,6 +13,7 @@ import {
   saveGuestProgress,
 } from '#/lib/guest'
 import { typenx } from '#/sdk'
+import type { WatchProgress } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/watch/$id')({
   validateSearch: (
@@ -138,8 +139,41 @@ function WatchPage() {
   )
   const animeId = search.show_id ?? params.id
   const episodeId = params.id
-  const savedProgress = getGuestProgress(animeId, episodeId)
+  const guestProgress = getGuestProgress(animeId, episodeId)
+  const [databaseProgress, setDatabaseProgress] =
+    React.useState<WatchProgress | null>(null)
   const progressTimerRef = React.useRef<number | null>(null)
+  const latestProgressRef = React.useRef<{
+    anime_id: string
+    episode_id: string
+    episode_number: number | null
+    position_seconds: number
+    duration_seconds: number | null
+    completed: boolean
+  } | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    async function loadSavedProgress() {
+      try {
+        const rows = await typenx.me.progress()
+        if (cancelled) return
+        setDatabaseProgress(
+          rows.find(
+            (row) => row.anime_id === animeId && row.episode_id === episodeId,
+          ) ?? null,
+        )
+      } catch {
+        if (!cancelled) setDatabaseProgress(null)
+      }
+    }
+
+    void loadSavedProgress()
+    return () => {
+      cancelled = true
+    }
+  }, [animeId, episodeId])
 
   const persistProgress = React.useCallback(
     (progress: {
@@ -153,6 +187,7 @@ function WatchPage() {
         episode_number: search.episode ?? null,
         ...progress,
       }
+      latestProgressRef.current = payload
 
       if (isGuestMode()) {
         saveGuestProgress(payload)
@@ -170,13 +205,23 @@ function WatchPage() {
     [animeId, episodeId, search.episode],
   )
 
+  const flushProgress = React.useCallback(() => {
+    const payload = latestProgressRef.current
+    if (!payload) return
+    if (progressTimerRef.current !== null) {
+      window.clearTimeout(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    void typenx.me.updateProgress(payload).catch(() => {
+      /* Browser-local guest progress remains the fallback. */
+    })
+  }, [])
+
   React.useEffect(
     () => () => {
-      if (progressTimerRef.current !== null) {
-        window.clearTimeout(progressTimerRef.current)
-      }
+      flushProgress()
     },
-    [],
+    [flushProgress],
   )
 
   const handleClose = () => {
@@ -202,6 +247,7 @@ function WatchPage() {
   const episodeLabel =
     search.title ??
     (search.episode ? `Episode ${search.episode}` : `Episode ${params.id}`)
+  const savedProgress = pickSavedProgress(guestProgress, databaseProgress)
 
   return (
     <VideoPlayer
@@ -218,4 +264,16 @@ function WatchPage() {
       onClose={handleClose}
     />
   )
+}
+
+function pickSavedProgress(
+  guestProgress: ReturnType<typeof getGuestProgress>,
+  databaseProgress: WatchProgress | null,
+) {
+  if (!guestProgress) return databaseProgress
+  if (!databaseProgress) return guestProgress
+  return new Date(databaseProgress.updated_at).getTime() >
+    new Date(guestProgress.updated_at).getTime()
+    ? databaseProgress
+    : guestProgress
 }
