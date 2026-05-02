@@ -70,4 +70,19 @@ export class CatalogResource {
   videos(request: VideoSourceRequest) {
     return this.http.post<VideoSourceResponse>('/videos', request)
   }
+
+  mangaCatalogs(request: CatalogRequest) {
+    return this.http.post<CatalogResponse>('/manga/catalogs', request)
+  }
+
+  mangaSearch(request: SearchRequest) {
+    return this.http.post<CatalogResponse>('/manga/search', request)
+  }
+
+  manga(mangaId: string, addonId?: string) {
+    const query = addonId ? `?addon_id=${encodeURIComponent(addonId)}` : ''
+    return this.http.get<AnimeMetadata>(
+      `/manga/${encodeURIComponent(mangaId)}${query}`,
+    )
+  }
 }

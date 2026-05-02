@@ -9,6 +9,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import {
+  BookOpen,
   ChevronsUpDown,
   LogOut,
   Puzzle,
@@ -72,6 +73,7 @@ export const Route = createFileRoute('/_authed')({
 
 const NAV_ITEMS = [
   { to: '/anime', label: 'Anime', icon: Tv },
+  { to: '/manga', label: 'Manga', icon: BookOpen },
   { to: '/addons', label: 'Addons', icon: Puzzle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const
@@ -135,7 +137,7 @@ function SidebarNavLink({
   label,
   icon: Icon,
 }: {
-  to: '/anime' | '/addons' | '/settings'
+  to: '/anime' | '/manga' | '/addons' | '/settings'
   label: string
   icon: React.ComponentType
 }) {
@@ -156,8 +158,9 @@ function SidebarNavLink({
 function HeaderSearch() {
   const navigate = useNavigate()
   const animeMatch = useMatch({ from: '/_authed/anime', shouldThrow: false })
+  const mangaMatch = useMatch({ from: '/_authed/manga', shouldThrow: false })
   const showMatch = useMatch({ from: '/_authed/show/$id', shouldThrow: false })
-  const initialQuery = animeMatch?.search.q ?? ''
+  const initialQuery = animeMatch?.search.q ?? mangaMatch?.search.q ?? ''
   const [value, setValue] = React.useState(initialQuery)
   const debounceRef = React.useRef<number | null>(null)
 
@@ -172,7 +175,7 @@ function HeaderSearch() {
     [],
   )
 
-  if (!animeMatch && !showMatch) return <div className="ml-auto" />
+  if (!animeMatch && !mangaMatch && !showMatch) return <div className="ml-auto" />
 
   return (
     <InputGroup className="ml-auto h-9 w-full max-w-md">
@@ -181,8 +184,8 @@ function HeaderSearch() {
       </InputGroupAddon>
       <InputGroupInput
         type="search"
-        placeholder="Search anime..."
-        aria-label="Search anime"
+        placeholder={mangaMatch ? 'Search manga...' : 'Search anime...'}
+        aria-label={mangaMatch ? 'Search manga' : 'Search anime'}
         value={value}
         onChange={(event) => {
           const next = event.target.value
@@ -191,7 +194,7 @@ function HeaderSearch() {
             window.clearTimeout(debounceRef.current)
           debounceRef.current = window.setTimeout(() => {
             void navigate({
-              to: '/anime',
+              to: mangaMatch ? '/manga' : '/anime',
               search: next.trim() ? { q: next } : {},
               replace: true,
             })

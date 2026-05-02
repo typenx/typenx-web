@@ -88,6 +88,10 @@ export type AddonResource =
   | 'video_sources'
 
 export type ContentType = 'anime' | 'movie' | 'ova' | 'ona' | 'special'
+  | 'manga'
+  | 'manhwa'
+  | 'manhua'
+  | 'light_novel'
 
 export type AddonManifest = {
   id: string
@@ -130,6 +134,7 @@ export type RegisterAddonRequest = {
 export type CatalogRequest = {
   addon_id?: string
   catalog_id: string
+  content_type?: ContentType
   skip?: number
   limit?: number
   query?: string
@@ -139,6 +144,7 @@ export type SearchRequest = {
   addon_id?: string
   query: string
   limit?: number
+  content_type?: ContentType
 }
 
 export type VideoSourceRequest = {
