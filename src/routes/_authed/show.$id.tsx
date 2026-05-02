@@ -27,6 +27,15 @@ import {
   ItemTitle,
 } from '#/components/ui/item'
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '#/components/ui/pagination'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -40,13 +49,23 @@ import type { AnimeMetadata, EpisodeMetadata } from '#/sdk'
 export const Route = createFileRoute('/_authed/show/$id')({
   validateSearch: (
     search,
-  ): { addon_id?: string; season?: number } => ({
+  ): {
+    addon_id?: string
+    season?: number
+    page?: number
+    order?: 'asc' | 'desc'
+  } => ({
     addon_id:
       typeof search.addon_id === 'string' ? search.addon_id : undefined,
     season:
       typeof search.season === 'number' && Number.isFinite(search.season)
         ? search.season
         : undefined,
+    page:
+      typeof search.page === 'number' && Number.isFinite(search.page)
+        ? Math.max(1, Math.floor(search.page))
+        : undefined,
+    order: search.order === 'desc' ? 'desc' : undefined,
   }),
   loaderDeps: ({ search }) => ({ addonId: search.addon_id }),
   loader: ({ params, deps, location }) =>
@@ -127,13 +146,41 @@ function ShowView({ show }: { show: AnimeMetadata }) {
     () => groupBySeason(show.episodes),
     [show.episodes],
   )
+  const hasSeasons = seasons.length > 0
   const hasMultipleSeasons = seasons.length > 1
   const firstSeasonNumber = seasons.at(0)?.number ?? 1
   const activeSeason = search.season ?? firstSeasonNumber
-  const activeEpisodes =
+  const seasonEpisodes =
     seasons.find((s) => s.number === activeSeason)?.episodes ??
     seasons.at(0)?.episodes ??
     []
+
+  const order = search.order ?? 'asc'
+  const activeEpisodes = React.useMemo(() => {
+    if (order === 'desc') return [...seasonEpisodes].reverse()
+    return seasonEpisodes
+  }, [seasonEpisodes, order])
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(activeEpisodes.length / PAGE_SIZE))
+  const currentPage = Math.min(Math.max(1, search.page ?? 1), totalPages)
+  const pageStart = (currentPage - 1) * PAGE_SIZE
+  const visibleEpisodes = activeEpisodes.slice(pageStart, pageStart + PAGE_SIZE)
+  const goToPage = (page: number) =>
+    navigate({
+      search: (prev) => ({ ...prev, page: page === 1 ? undefined : page }),
+      replace: true,
+    })
+
+  const handleSelectSeason = (value: string) =>
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        season: Number(value),
+        page: undefined,
+      }),
+      replace: true,
+    })
 
   return (
     <div className="relative">
@@ -185,14 +232,14 @@ function ShowView({ show }: { show: AnimeMetadata }) {
 
             <MetaStrip show={show} />
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 size="lg"
                 className="gap-2"
-                disabled={show.episodes.length === 0}
+                disabled={seasonEpisodes.length === 0}
                 onClick={() => {
-                  if (show.episodes.length === 0) return
-                  const first = show.episodes[0]
+                  if (seasonEpisodes.length === 0) return
+                  const first = seasonEpisodes[0]
                   void rootNavigate({
                     to: '/watch/$id',
                     params: { id: first.id },
@@ -209,8 +256,33 @@ function ShowView({ show }: { show: AnimeMetadata }) {
                 }}
               >
                 <Play className="fill-current" />
-                Play
+                {hasMultipleSeasons
+                  ? `Play S${activeSeason} E${seasonEpisodes[0]?.number ?? 1}`
+                  : 'Play'}
               </Button>
+              {hasSeasons && (
+                <Select
+                  value={String(activeSeason)}
+                  onValueChange={handleSelectSeason}
+                >
+                  <SelectTrigger
+                    className="h-10 min-w-[8rem] gap-2"
+                    aria-label="Select season"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {seasons.map((season) => (
+                      <SelectItem
+                        key={season.number}
+                        value={String(season.number)}
+                      >
+                        Season {season.number} · {season.episodes.length} ep
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {show.site_url && (
                 <Button size="lg" variant="secondary" asChild>
                   <a href={show.site_url} target="_blank" rel="noreferrer">
@@ -244,59 +316,92 @@ function ShowView({ show }: { show: AnimeMetadata }) {
                   {hasMultipleSeasons
                     ? `${activeEpisodes.length} in season ${activeSeason} · ${show.episodes.length} total`
                     : `${show.episodes.length} total`}
+                  {totalPages > 1 &&
+                    ` · page ${currentPage} of ${totalPages}`}
                 </p>
               </div>
-              {hasMultipleSeasons && (
-                <Select
-                  value={String(activeSeason)}
-                  onValueChange={(value) =>
-                    navigate({
-                      search: (prev) => ({ ...prev, season: Number(value) }),
-                      replace: true,
-                    })
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {seasons.map((season) => (
-                      <SelectItem
-                        key={season.number}
-                        value={String(season.number)}
-                      >
-                        Season {season.number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {activeEpisodes.length > 0 ? (
-              <ItemGroup className="gap-0 overflow-hidden rounded-xl border border-border bg-card/40 [&>[data-slot=item]+[data-slot=item]]:border-t [&>[data-slot=item]]:rounded-none [&>[data-slot=item]]:border-x-0 [&>[data-slot=item]]:border-y-0">
-                {activeEpisodes.map((episode) => (
-                  <EpisodeRow
-                    key={episode.id}
-                    episode={episode}
-                    onPlay={() =>
-                      void rootNavigate({
-                        to: '/watch/$id',
-                        params: { id: episode.id },
-                        search: {
-                          show_id: show.id,
-                          show: show.title,
-                          addon_id: search.addon_id,
-                          season:
-                            episode.season_number ?? episode.season ?? undefined,
-                          episode: episode.number,
-                          title: episode.title ?? undefined,
-                        },
+              <div className="flex items-center gap-2">
+                {hasMultipleSeasons && (
+                  <Select
+                    value={String(activeSeason)}
+                    onValueChange={handleSelectSeason}
+                  >
+                    <SelectTrigger className="w-40" aria-label="Select season">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {seasons.map((season) => (
+                        <SelectItem
+                          key={season.number}
+                          value={String(season.number)}
+                        >
+                          Season {season.number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {activeEpisodes.length > 1 && (
+                  <Select
+                    value={order}
+                    onValueChange={(value) =>
+                      navigate({
+                        search: (prev) => ({
+                          ...prev,
+                          order: value === 'desc' ? 'desc' : undefined,
+                          page: undefined,
+                        }),
+                        replace: true,
                       })
                     }
+                  >
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                      <SelectItem value="desc">Descending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+
+            {visibleEpisodes.length > 0 ? (
+              <>
+                <ItemGroup className="gap-0 overflow-hidden rounded-xl border border-border bg-card/40 [&>[data-slot=item]+[data-slot=item]]:border-t [&>[data-slot=item]]:rounded-none [&>[data-slot=item]]:border-x-0 [&>[data-slot=item]]:border-y-0">
+                  {visibleEpisodes.map((episode) => (
+                    <EpisodeRow
+                      key={episode.id}
+                      episode={episode}
+                      onPlay={() =>
+                        void rootNavigate({
+                          to: '/watch/$id',
+                          params: { id: episode.id },
+                          search: {
+                            show_id: show.id,
+                            show: show.title,
+                            addon_id: search.addon_id,
+                            season:
+                              episode.season_number ??
+                              episode.season ??
+                              undefined,
+                            episode: episode.number,
+                            title: episode.title ?? undefined,
+                          },
+                        })
+                      }
+                    />
+                  ))}
+                </ItemGroup>
+                {totalPages > 1 && (
+                  <EpisodesPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={goToPage}
                   />
-                ))}
-              </ItemGroup>
+                )}
+              </>
             ) : (
               <div className="rounded-xl border border-border bg-card/40 px-4 py-8 text-center text-sm text-muted-foreground">
                 No episode metadata is available from this addon.
@@ -307,6 +412,90 @@ function ShowView({ show }: { show: AnimeMetadata }) {
       </div>
     </div>
   )
+}
+
+function EpisodesPagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}) {
+  const items = visiblePages(currentPage, totalPages)
+
+  return (
+    <Pagination className="mt-6">
+      <PaginationContent>
+        <PaginationItem>
+          <PaginationPrevious
+            href="#"
+            aria-disabled={currentPage === 1}
+            className={
+              currentPage === 1 ? 'pointer-events-none opacity-50' : undefined
+            }
+            onClick={(event) => {
+              event.preventDefault()
+              if (currentPage > 1) onPageChange(currentPage - 1)
+            }}
+          />
+        </PaginationItem>
+        {items.map((item, index) =>
+          item === 'ellipsis' ? (
+            <PaginationItem key={`ellipsis-${index}`}>
+              <PaginationEllipsis />
+            </PaginationItem>
+          ) : (
+            <PaginationItem key={item}>
+              <PaginationLink
+                href="#"
+                isActive={item === currentPage}
+                onClick={(event) => {
+                  event.preventDefault()
+                  onPageChange(item)
+                }}
+              >
+                {item}
+              </PaginationLink>
+            </PaginationItem>
+          ),
+        )}
+        <PaginationItem>
+          <PaginationNext
+            href="#"
+            aria-disabled={currentPage === totalPages}
+            className={
+              currentPage === totalPages
+                ? 'pointer-events-none opacity-50'
+                : undefined
+            }
+            onClick={(event) => {
+              event.preventDefault()
+              if (currentPage < totalPages) onPageChange(currentPage + 1)
+            }}
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
+  )
+}
+
+function visiblePages(
+  current: number,
+  total: number,
+): Array<number | 'ellipsis'> {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  const items: Array<number | 'ellipsis'> = [1]
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+  if (start > 2) items.push('ellipsis')
+  for (let i = start; i <= end; i++) items.push(i)
+  if (end < total - 1) items.push('ellipsis')
+  items.push(total)
+  return items
 }
 
 function MetaStrip({ show }: { show: AnimeMetadata }) {
