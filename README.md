@@ -1,16 +1,16 @@
 # Typenx Web
 
-Typenx Web is the React frontend for Typenx. It provides the local user interface for authentication, anime discovery, addon management, and account/library views backed by Typenx Core.
+The React frontend for Typenx — discovery, library, account, and addon management for a self-hostable anime hub.
+
+Typenx Web is a TanStack Start application that talks to [Typenx Core](https://github.com/typenx/typenx-core) over a typed SDK. It handles the AniList and MyAnimeList sign-in flows, browses anime through any registered metadata addon, surfaces recommendations from your own data, and gives you a panel to plug in new addon URLs without touching the backend config.
 
 ## Prerequisites
 
 - Node.js 20 or newer
 - npm
-- A running Typenx Core API server
+- A running Typenx Core API (`http://127.0.0.1:8080` by default)
 
-By default, the frontend expects the API at `http://127.0.0.1:8080`.
-
-## Setup
+## Quick start
 
 ```powershell
 Copy-Item .env.example .env
@@ -18,25 +18,25 @@ npm install
 npm run dev
 ```
 
-The development server starts on `http://127.0.0.1:3000`.
+The dev server runs on `http://127.0.0.1:3000`.
 
 ## Environment
 
 Configuration is read from `.env`:
 
-- `VITE_TYPENX_API_BASE_URL`: base URL for Typenx Core API requests.
-- `VITE_TYPENX_AUTH_CALLBACK_PATH`: frontend route used after OAuth login.
+- `VITE_TYPENX_API_BASE_URL` — base URL for Typenx Core API requests.
+- `VITE_TYPENX_AUTH_CALLBACK_PATH` — frontend route used after OAuth login.
 
-For the default local backend, use:
+A working local pair:
 
 ```ini
 VITE_TYPENX_API_BASE_URL=http://127.0.0.1:8080
 VITE_TYPENX_AUTH_CALLBACK_PATH=/auth/callback
 ```
 
-## Backend Pairing
+## Backend pairing
 
-Start the backend from the sibling `core` project before signing in or calling authenticated API routes:
+Start Typenx Core in a sibling terminal before signing in or hitting authenticated routes:
 
 ```powershell
 cd ..\core
@@ -62,17 +62,17 @@ npm run format   # Format and fix lint issues
 npm run check    # Check Prettier formatting
 ```
 
-## Project Structure
+## Project structure
 
-- `src/routes/`: file-based application routes.
-- `src/components/`: shared UI and application components.
-- `src/sdk/`: typed API client for Typenx Core.
-- `src/styles.css`: Tailwind CSS entrypoint and global styles.
+- `src/routes/` — file-based application routes.
+- `src/components/` — shared UI and application components.
+- `src/sdk/` — typed API client for Typenx Core.
+- `src/styles.css` — Tailwind CSS entrypoint and global styles.
 
-## Production Build
+## Production build
 
 ```powershell
 npm run build
 ```
 
-Review the generated output in `dist/` and serve it with the deployment platform used for the application.
+The output lands in `dist/`. Serve it with whichever static host or platform you deploy to; the frontend is a fully static bundle.
