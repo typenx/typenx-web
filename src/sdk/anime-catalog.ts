@@ -8,6 +8,7 @@ import type {
   AnimePreview,
   AuthProvider,
   ProviderAccount,
+  WatchProgress,
 } from '#/sdk'
 
 export type CatalogRow = {
@@ -18,7 +19,8 @@ export type CatalogRow = {
 
 export type WatchingShow = {
   addon: AddonRegistration
-  entry: AnimeListEntry
+  entry: AnimeListEntry | null
+  progress: WatchProgress | null
   show: AnimePreview
 }
 
@@ -42,15 +44,26 @@ const OFFICIAL_ADDON_IDS = [
 ]
 
 const SEASON_CENTRALIZER_ADDON_ID = 'typenx-addon-season-centralizer'
+const SEARCH_CACHE_TTL_MS = 10 * 60_000
+
+type SearchCacheEntry = {
+  expiresAt: number
+  promise: Promise<AddonSearchResult[]>
+  value?: AddonSearchResult[]
+}
+
+const searchCache = new Map<string, SearchCacheEntry>()
 
 export async function loadAnimeCatalog(): Promise<AnimeCatalogData> {
   const guest = isGuestMode()
-  const [addons, providers, library] = await Promise.all([
+  const [addons, providers, library, progress] = await Promise.all([
     typenx.addons.list(),
     guest ? Promise.resolve<ProviderAccount[]>([]) : typenx.me.providers(),
     guest ? Promise.resolve<AnimeListEntry[]>([]) : typenx.me.library(),
+    guest ? Promise.resolve<WatchProgress[]>([]) : typenx.me.progress(),
   ])
   const selectedAddons = selectCatalogAddons(addons, providers)
+  const enabledAddons = addons.filter((addon) => addon.enabled)
   const [rows, watching] = await Promise.all([
     Promise.all(
       selectedAddons.map(async (addon) => {
@@ -73,7 +86,7 @@ export async function loadAnimeCatalog(): Promise<AnimeCatalogData> {
         }
       }),
     ),
-    loadCurrentlyWatching(library, selectedAddons),
+    loadCurrentlyWatching(library, progress, enabledAddons),
   ])
   const featured = await loadFeaturedDetails(rows, watching)
   return { rows, watching, featured }
@@ -110,15 +123,62 @@ function pickFeatured(
   return null
 }
 
+function seasonCentralizerAddon(addons: AddonRegistration[]) {
+  return addons.find(
+    (addon) => addon.manifest?.id === SEASON_CENTRALIZER_ADDON_ID,
+  )
+}
+
 export async function searchAnimeCatalog(
   query: string,
   limit = 18,
 ): Promise<AddonSearchResult[]> {
-  return typenx.catalog.searchAddons({ query, limit })
+  const cacheKey = searchCacheKey(query, limit)
+  const now = Date.now()
+  const cached = searchCache.get(cacheKey)
+
+  if (cached && cached.expiresAt > now) {
+    return cached.value ?? cached.promise
+  }
+
+  const promise = typenx.catalog.searchAddons({ query, limit }).then((value) => {
+    const entry = searchCache.get(cacheKey)
+    if (entry) entry.value = value
+    return value
+  })
+
+  searchCache.set(cacheKey, {
+    expiresAt: now + SEARCH_CACHE_TTL_MS,
+    promise,
+  })
+
+  try {
+    return await promise
+  } catch (error) {
+    searchCache.delete(cacheKey)
+    throw error
+  }
+}
+
+export function getCachedAnimeCatalogSearch(query: string, limit = 18) {
+  const cached = searchCache.get(searchCacheKey(query, limit))
+  if (!cached || cached.expiresAt <= Date.now()) return null
+  return cached.value ?? null
+}
+
+export function prefetchAnimeCatalogSearch(query: string, limit = 18) {
+  void searchAnimeCatalog(query, limit).catch(() => {
+    // The active UI path reports errors. Prefetch should stay quiet.
+  })
+}
+
+function searchCacheKey(query: string, limit: number) {
+  return `${query.trim().toLowerCase()}:${limit}`
 }
 
 async function loadCurrentlyWatching(
   library: AnimeListEntry[],
+  progress: WatchProgress[],
   addons: AddonRegistration[],
 ): Promise<WatchingShow[]> {
   const watchingEntries = library
@@ -131,7 +191,9 @@ async function loadCurrentlyWatching(
 
   const loaded = await Promise.all(
     watchingEntries.map(async (entry) => {
-      const addon = addonForProvider(addons, entry.provider)
+      const addon =
+        seasonCentralizerAddon(addons) ??
+        addonForProvider(addons, entry.provider)
       if (!addon) return null
 
       try {
@@ -148,11 +210,12 @@ async function loadCurrentlyWatching(
           response.items.at(0)
 
         if (!show) return null
-        return { addon, entry, show }
+        return { addon, entry, progress: null, show }
       } catch {
         return {
           addon,
           entry,
+          progress: null,
           show: {
             id: entry.provider_anime_id,
             title: entry.title,
@@ -165,7 +228,78 @@ async function loadCurrentlyWatching(
     }),
   )
 
+  const loadedFromLibrary = loaded.filter(
+    (item): item is WatchingShow => !!item,
+  )
+  const loadedFromProgress = await loadProgressShows(
+    progress,
+    addons,
+    loadedFromLibrary,
+  )
+
+  return uniqueWatchingShows([...loadedFromProgress, ...loadedFromLibrary]).slice(
+    0,
+    12,
+  )
+}
+
+async function loadProgressShows(
+  progress: WatchProgress[],
+  addons: AddonRegistration[],
+  existing: WatchingShow[],
+): Promise<WatchingShow[]> {
+  const addon = seasonCentralizerAddon(addons) ?? addons[0]
+  if (!addon) return []
+
+  const existingIds = new Set(existing.map((item) => item.show.id))
+  const recent = progress
+    .filter((row) => !row.completed && !existingIds.has(row.anime_id))
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
+    .slice(0, 12)
+
+  const loaded = await Promise.all(
+    recent.map(async (row) => {
+      try {
+        const metadata = await typenx.catalog.anime(row.anime_id, addon.id)
+        return {
+          addon,
+          entry: null,
+          progress: row,
+          show: metadataToPreview(metadata),
+        }
+      } catch {
+        return null
+      }
+    }),
+  )
+
   return loaded.filter((item): item is WatchingShow => !!item)
+}
+
+function metadataToPreview(metadata: AnimeMetadata): AnimePreview {
+  return {
+    id: metadata.id,
+    title: metadata.title,
+    poster: metadata.poster,
+    banner: metadata.banner,
+    synopsis: metadata.synopsis ?? metadata.description,
+    score: metadata.score,
+    year: metadata.year ?? metadata.season_year,
+    content_type: metadata.content_type,
+    genres: metadata.genres,
+  }
+}
+
+function uniqueWatchingShows(shows: WatchingShow[]) {
+  const seen = new Set<string>()
+  return shows.filter((item) => {
+    if (seen.has(item.show.id)) return false
+    seen.add(item.show.id)
+    return true
+  })
 }
 
 export function selectCatalogAddons(

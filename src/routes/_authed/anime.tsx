@@ -14,7 +14,9 @@ import { withAuthRedirect } from '#/lib/loaders'
 import { Button } from '#/components/ui/button'
 import {
   addonName,
+  getCachedAnimeCatalogSearch,
   loadAnimeCatalog,
+  prefetchAnimeCatalogSearch,
   searchAnimeCatalog,
 } from '#/sdk/anime-catalog'
 import type {
@@ -107,6 +109,14 @@ function AnimePage() {
     }
 
     async function runSearch() {
+      const cached = getCachedAnimeCatalogSearch(trimmedQuery)
+      if (cached) {
+        setSearchResults(cached)
+        setSearchError(null)
+        setIsSearching(false)
+        return
+      }
+
       try {
         setIsSearching(true)
         const results = await searchAnimeCatalog(trimmedQuery)
@@ -145,6 +155,14 @@ function AnimePage() {
     }
 
     async function loadGenre() {
+      const cached = getCachedAnimeCatalogSearch(activeGenre, 24)
+      if (cached) {
+        setGenreResults(cached)
+        setGenreError(null)
+        setIsLoadingGenre(false)
+        return
+      }
+
       try {
         setIsLoadingGenre(true)
         const results = await searchAnimeCatalog(activeGenre, 24)
@@ -210,6 +228,11 @@ function AnimePage() {
             replace: true,
           })
         }
+        onWarm={(nextGenre) => {
+          if (nextGenre !== 'All Genres') {
+            prefetchAnimeCatalogSearch(nextGenre, 24)
+          }
+        }}
       />
 
       <div className="flex flex-col gap-8">
@@ -398,9 +421,11 @@ function FeaturedHero({ featured }: { featured: FeaturedShowDetails | null }) {
 function GenreRow({
   active,
   onSelect,
+  onWarm,
 }: {
   active: string
   onSelect: (genre: string) => void
+  onWarm: (genre: string) => void
 }) {
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -410,6 +435,8 @@ function GenreRow({
             key={genre}
             type="button"
             onClick={() => onSelect(genre)}
+            onFocus={() => onWarm(genre)}
+            onMouseEnter={() => onWarm(genre)}
             className={cn(
               'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
               active === genre
