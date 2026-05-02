@@ -67,15 +67,32 @@ function AnimePage() {
     () => filterWatchingByGenre(data.watching, activeGenre),
     [data.watching, activeGenre],
   )
-  const hasVisibleShows =
-    filteredWatching.length > 0 ||
-    filteredRows.some((row) => row.error || row.shows.length > 0)
 
   const [searchResults, setSearchResults] = React.useState<AddonSearchResult[]>(
     [],
   )
   const [isSearching, setIsSearching] = React.useState(false)
   const [searchError, setSearchError] = React.useState<string | null>(null)
+  const [genreResults, setGenreResults] = React.useState<AddonSearchResult[]>(
+    [],
+  )
+  const [isLoadingGenre, setIsLoadingGenre] = React.useState(false)
+  const [genreError, setGenreError] = React.useState<string | null>(null)
+  const genreShows = React.useMemo(
+    () =>
+      uniqueRowItems(
+        genreResults.map((result) => ({
+          addon: result.addon,
+          show: result.item,
+        })),
+      ),
+    [genreResults],
+  )
+  const hasVisibleShows =
+    filteredWatching.length > 0 ||
+    genreShows.length > 0 ||
+    isLoadingGenre ||
+    filteredRows.some((row) => row.error || row.shows.length > 0)
 
   React.useEffect(() => {
     let cancelled = false
@@ -114,6 +131,46 @@ function AnimePage() {
       cancelled = true
     }
   }, [trimmedQuery])
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    if (activeGenre === 'All Genres') {
+      setGenreResults([])
+      setGenreError(null)
+      setIsLoadingGenre(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    async function loadGenre() {
+      try {
+        setIsLoadingGenre(true)
+        const results = await searchAnimeCatalog(activeGenre, 24)
+        if (!cancelled) {
+          setGenreResults(results)
+          setGenreError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setGenreResults([])
+          setGenreError(
+            err instanceof Error
+              ? err.message
+              : `Unable to load ${activeGenre} anime`,
+          )
+        }
+      } finally {
+        if (!cancelled) setIsLoadingGenre(false)
+      }
+    }
+
+    void loadGenre()
+    return () => {
+      cancelled = true
+    }
+  }, [activeGenre])
 
   if (trimmedQuery.length > 0) {
     return (
@@ -171,6 +228,14 @@ function AnimePage() {
             No {activeGenre} anime came back from the configured addons.
           </div>
         )}
+        {activeGenre !== 'All Genres' && (
+          <GenreResultsRow
+            genre={activeGenre}
+            shows={genreShows}
+            isLoading={isLoadingGenre}
+            error={genreError}
+          />
+        )}
         {filteredRows.map((row) => (
           <AddonCardRow key={row.addon.id} row={row} />
         ))}
@@ -206,6 +271,16 @@ function hasGenre(show: AnimePreview, genre: string) {
 
 function normalizeGenre(value: string) {
   return value.trim().toLowerCase().replaceAll(/[\s_-]+/g, ' ')
+}
+
+function uniqueRowItems(items: RowItem[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = `${item.addon.id}:${item.show.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function AnimePending() {
@@ -357,6 +432,43 @@ function GenreRow({
 type RowItem = {
   addon: CatalogRow['addon']
   show: AnimePreview
+}
+
+function GenreResultsRow({
+  genre,
+  shows,
+  isLoading,
+  error,
+}: {
+  genre: string
+  shows: RowItem[]
+  isLoading: boolean
+  error: string | null
+}) {
+  if (error) {
+    return (
+      <section>
+        <SectionHeader title={`${genre} Anime`} />
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      </section>
+    )
+  }
+
+  if (isLoading && shows.length === 0) {
+    return (
+      <section>
+        <SectionHeader title={`${genre} Anime`} />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading {genre.toLowerCase()} anime...
+        </div>
+      </section>
+    )
+  }
+
+  return <CardRow title={`${genre} Anime`} shows={shows} />
 }
 
 function AddonCardRow({ row }: { row: CatalogRow }) {
