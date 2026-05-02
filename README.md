@@ -1,6 +1,10 @@
 # Typenx Web
 
-Typenx Web is the React frontend for Typenx. It provides the local user interface for authentication, anime discovery, addon management, and account/library views backed by Typenx Core.
+Typenx Web is the React frontend for Typenx, a self-hostable anime discovery and library platform built around open addons.
+
+It provides the local user interface for authentication, anime discovery, addon management, account/library views, and media browsing backed by Typenx Core.
+
+Typenx is aiming for its first 100 stars. If you like self-hosted media tools or anime discovery, star [typenx-core](https://github.com/typenx/typenx-core) and follow this frontend as it grows.
 
 ## Prerequisites
 
