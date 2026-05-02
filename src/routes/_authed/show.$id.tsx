@@ -313,11 +313,29 @@ function ShowView({
     })
   }
 
+  const readChapter = (chapter: EpisodeMetadata) => {
+    void rootNavigate({
+      to: '/read/$chapterId',
+      params: { chapterId: chapter.id },
+      search: {
+        manga_id: show.id,
+        manga: show.title,
+        addon_id: search.addon_id,
+        chapter: chapter.number,
+        volume:
+          chapter.season_number ?? chapter.season ?? undefined,
+        title: chapter.title ?? undefined,
+      },
+    })
+  }
+
   const playPrimary = () => {
-    if (isManga) return
-    const target = resumeEpisode ?? seasonEpisodes[0]
-    if (!target) return
-    playEpisode(target)
+    if (seasonEpisodes.length === 0) return
+    if (isManga) {
+      readChapter(seasonEpisodes[0])
+      return
+    }
+    playEpisode(resumeEpisode ?? seasonEpisodes[0])
   }
 
   return (
@@ -380,7 +398,7 @@ function ShowView({
                 <Button
                   size="lg"
                   className="gap-2"
-                  disabled={isManga || show.episodes.length === 0}
+                  disabled={show.episodes.length === 0}
                   onClick={playPrimary}
                 >
                   <Play className="fill-current" />
@@ -493,7 +511,11 @@ function ShowView({
                           episode={episode}
                           label={isManga ? 'Chapter' : 'Episode'}
                           fallbackImage={episodeFallbackImage}
-                          onPlay={isManga ? undefined : () => playEpisode(episode)}
+                          onPlay={
+                            isManga
+                              ? () => readChapter(episode)
+                              : () => playEpisode(episode)
+                          }
                         />
                       ))}
                     </ItemGroup>
