@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
+import { Button } from '#/components/ui/button'
 import { VideoPlayer } from '#/components/custom/video-player'
 import type {
   AudioOption,
@@ -41,16 +43,6 @@ export const Route = createFileRoute('/_authed/watch/$id')({
   }),
   component: WatchPage,
 })
-
-const TEST_VIDEO_URL =
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-
-const QUALITIES: Array<QualityOption> = [
-  { label: '1080p', url: TEST_VIDEO_URL },
-  { label: '720p', url: TEST_VIDEO_URL },
-  { label: '480p', url: TEST_VIDEO_URL },
-  { label: 'Auto', url: TEST_VIDEO_URL },
-]
 
 const AUDIO_TRACKS: Array<AudioOption> = [
   { id: 'jpn', language: 'Japanese', label: 'Original' },
@@ -142,7 +134,8 @@ function WatchPage() {
   const guestProgress = getGuestProgress(animeId, episodeId)
   const [databaseProgress, setDatabaseProgress] =
     React.useState<WatchProgress | null>(null)
-  const [qualities, setQualities] = React.useState<Array<QualityOption>>(QUALITIES)
+  const [qualities, setQualities] = React.useState<Array<QualityOption>>([])
+  const [isLoadingVideo, setIsLoadingVideo] = React.useState(true)
   const [videoError, setVideoError] = React.useState<string | null>(null)
   const [sourceSubtitles, setSourceSubtitles] = React.useState<Array<SubtitleCountry>>([])
   const progressTimerRef = React.useRef<number | null>(null)
@@ -160,10 +153,14 @@ function WatchPage() {
 
     async function loadVideoSources() {
       try {
+        setIsLoadingVideo(true)
+        setVideoError(null)
         const addons = await typenx.addons.list()
         const addon = pickVideoAddon(addons)
         if (!addon) {
           setVideoError('No video source addon is enabled.')
+          setQualities([])
+          setSourceSubtitles([])
           return
         }
 
@@ -180,6 +177,8 @@ function WatchPage() {
         if (cancelled) return
         if (response.streams.length === 0) {
           setVideoError(`${addon.manifest?.name ?? 'Video addon'} returned no streams.`)
+          setQualities([])
+          setSourceSubtitles([])
           return
         }
 
@@ -194,7 +193,11 @@ function WatchPage() {
       } catch (err) {
         if (!cancelled) {
           setVideoError(err instanceof Error ? err.message : 'Unable to load video source.')
+          setQualities([])
+          setSourceSubtitles([])
         }
+      } finally {
+        if (!cancelled) setIsLoadingVideo(false)
       }
     }
 
@@ -300,6 +303,36 @@ function WatchPage() {
     search.title ??
     (search.episode ? `Episode ${search.episode}` : `Episode ${params.id}`)
   const savedProgress = pickSavedProgress(guestProgress, databaseProgress)
+
+  if (isLoadingVideo || qualities.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black px-6 text-white">
+        <Button
+          variant="ghost"
+          className="absolute left-4 top-4 text-white hover:bg-white/15 hover:text-white"
+          onClick={handleClose}
+        >
+          <ArrowLeft />
+          Back
+        </Button>
+        <div className="flex max-w-md flex-col items-center gap-3 text-center">
+          {isLoadingVideo ? (
+            <>
+              <Loader2 className="size-6 animate-spin text-white/70" />
+              <p className="text-sm text-white/70">Finding episode streams...</p>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-semibold">No stream found</p>
+              <p className="text-sm text-white/70">
+                {videoError ?? 'The enabled video addon did not return a playable source.'}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <VideoPlayer

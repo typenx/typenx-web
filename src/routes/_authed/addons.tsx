@@ -72,7 +72,7 @@ function AddonsPage() {
           Extend your typenx
         </h1>
         <p className="text-sm text-muted-foreground">
-          Register catalog addons by their base URL.
+          Register catalog, metadata, and video source addons by their base URL.
         </p>
       </div>
 
