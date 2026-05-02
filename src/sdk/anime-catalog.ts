@@ -35,10 +35,13 @@ export type AnimeCatalogData = {
 }
 
 const OFFICIAL_ADDON_IDS = [
+  'typenx-addon-season-centralizer',
   'typenx-addon-anilist',
   'typenx-addon-myanimelist',
   'typenx-addon-kitsu',
 ]
+
+const SEASON_CENTRALIZER_ADDON_ID = 'typenx-addon-season-centralizer'
 
 export async function loadAnimeCatalog(): Promise<AnimeCatalogData> {
   const guest = isGuestMode()
@@ -187,7 +190,12 @@ export function selectCatalogAddons(
   const unlinkedOfficial = official.filter(
     (addon) => !providerOrder.includes(addon.manifest?.id ?? ''),
   )
-  const selected = uniqueAddons([...linkedOfficial, ...unlinkedOfficial])
+  const centralizer = official.find(
+    (addon) => addon.manifest?.id === SEASON_CENTRALIZER_ADDON_ID,
+  )
+  const selected = centralizer
+    ? [centralizer]
+    : uniqueAddons([...linkedOfficial, ...unlinkedOfficial])
 
   if (selected.length > 0) return uniqueAddons(selected)
   return enabled

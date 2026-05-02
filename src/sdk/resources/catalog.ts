@@ -26,6 +26,7 @@ export class CatalogResource {
     const enabled = addons.filter((addon) => addon.enabled)
     const official = enabled.filter((addon) =>
       [
+        'typenx-addon-season-centralizer',
         'typenx-addon-anilist',
         'typenx-addon-myanimelist',
         'typenx-addon-kitsu',
@@ -33,7 +34,14 @@ export class CatalogResource {
         addon.manifest?.id ?? '',
       ),
     )
-    const selected = official.length > 0 ? official : enabled
+    const centralizer = official.find(
+      (addon) => addon.manifest?.id === 'typenx-addon-season-centralizer',
+    )
+    const selected = centralizer
+      ? [centralizer]
+      : official.length > 0
+        ? official
+        : enabled
     const rows = await Promise.all(
       selected.map(async (addon) => {
         const response = await this.search({

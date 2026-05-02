@@ -71,6 +71,15 @@ export type WatchProgress = {
   updated_at: string
 }
 
+export type UpsertWatchProgressRequest = {
+  anime_id: string
+  episode_id?: string | null
+  episode_number?: number | null
+  position_seconds: number
+  duration_seconds?: number | null
+  completed: boolean
+}
+
 export type AddonResource = 'catalog' | 'search' | 'anime_meta' | 'episode_meta'
 
 export type ContentType = 'anime' | 'movie' | 'ova' | 'ona' | 'special'
@@ -136,6 +145,15 @@ export type CatalogResponse = {
   items: AnimePreview[]
 }
 
+export type SeasonEntry = {
+  id: string
+  title: string
+  season_number: number | null
+  year: number | null
+  episode_count: number | null
+  source?: string | null
+}
+
 export type AnimePreview = {
   id: string
   title: string
@@ -145,6 +163,7 @@ export type AnimePreview = {
   score?: number | null
   year: number | null
   content_type: ContentType
+  season_entries?: SeasonEntry[]
 }
 
 export type AnimeMetadata = {

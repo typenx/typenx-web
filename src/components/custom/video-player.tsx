@@ -59,6 +59,12 @@ export type VideoPlayerProps = {
   title?: string
   subtitle?: string
   poster?: string
+  initialTime?: number
+  onProgress?: (progress: {
+    position_seconds: number
+    duration_seconds: number | null
+    completed: boolean
+  }) => void
   onClose?: () => void
 }
 
@@ -74,6 +80,8 @@ export function VideoPlayer({
   title,
   subtitle,
   poster,
+  initialTime = 0,
+  onProgress,
   onClose,
 }: VideoPlayerProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null)
@@ -101,6 +109,7 @@ export function VideoPlayer({
   const [waiting, setWaiting] = React.useState(false)
 
   const hideTimerRef = React.useRef<number | null>(null)
+  const lastProgressRef = React.useRef(0)
 
   const activeQuality = qualities[qualityIndex]
 
@@ -254,6 +263,20 @@ export function VideoPlayer({
     if (video.buffered.length > 0) {
       setBuffered(video.buffered.end(video.buffered.length - 1))
     }
+    if (Math.abs(video.currentTime - lastProgressRef.current) >= 5) {
+      emitProgress(video, false)
+    }
+  }
+
+  const emitProgress = (video: HTMLVideoElement, completed: boolean) => {
+    lastProgressRef.current = video.currentTime
+    onProgress?.({
+      position_seconds: Math.max(0, Math.floor(video.currentTime)),
+      duration_seconds: Number.isFinite(video.duration)
+        ? Math.floor(video.duration)
+        : null,
+      completed,
+    })
   }
 
   const VolumeIcon =
@@ -279,14 +302,23 @@ export function VideoPlayer({
         autoPlay
         onClick={togglePlay}
         onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPause={(e) => {
+          setPlaying(false)
+          emitProgress(e.currentTarget, false)
+        }}
         onTimeUpdate={onTimeUpdate}
         onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onLoadedMetadata={(e) => {
+          setDuration(e.currentTarget.duration || 0)
+          if (initialTime > 0) e.currentTarget.currentTime = initialTime
+        }}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
         onCanPlay={() => setWaiting(false)}
-        onEnded={() => setPlaying(false)}
+        onEnded={(e) => {
+          setPlaying(false)
+          emitProgress(e.currentTarget, true)
+        }}
       >
         {subtitleCountries.flatMap((country) =>
           country.tracks

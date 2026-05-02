@@ -7,13 +7,12 @@ import {
 } from '@tanstack/react-router'
 import {
   ArrowLeft,
-  Calendar,
-  Clock,
   ExternalLink,
+  Film,
   Loader2,
+  Plus,
   Play,
   Star,
-  Users,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
@@ -42,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { withAuthRedirect } from '#/lib/loaders'
 import { isTypenxApiError, typenx } from '#/sdk'
 import type { AnimeMetadata, EpisodeMetadata } from '#/sdk'

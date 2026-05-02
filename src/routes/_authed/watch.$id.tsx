@@ -7,6 +7,12 @@ import type {
   QualityOption,
   SubtitleCountry,
 } from '#/components/custom/video-player'
+import {
+  getGuestProgress,
+  isGuestMode,
+  saveGuestProgress,
+} from '#/lib/guest'
+import { typenx } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/watch/$id')({
   validateSearch: (
@@ -130,6 +136,48 @@ function WatchPage() {
     () => (vttUrl ? buildSubtitles(vttUrl) : []),
     [vttUrl],
   )
+  const animeId = search.show_id ?? params.id
+  const episodeId = params.id
+  const savedProgress = getGuestProgress(animeId, episodeId)
+  const progressTimerRef = React.useRef<number | null>(null)
+
+  const persistProgress = React.useCallback(
+    (progress: {
+      position_seconds: number
+      duration_seconds: number | null
+      completed: boolean
+    }) => {
+      const payload = {
+        anime_id: animeId,
+        episode_id: episodeId,
+        episode_number: search.episode ?? null,
+        ...progress,
+      }
+
+      if (isGuestMode()) {
+        saveGuestProgress(payload)
+      }
+
+      if (progressTimerRef.current !== null) {
+        window.clearTimeout(progressTimerRef.current)
+      }
+      progressTimerRef.current = window.setTimeout(() => {
+        void typenx.me.updateProgress(payload).catch(() => {
+          /* Browser-local guest progress remains the fallback. */
+        })
+      }, 250)
+    },
+    [animeId, episodeId, search.episode],
+  )
+
+  React.useEffect(
+    () => () => {
+      if (progressTimerRef.current !== null) {
+        window.clearTimeout(progressTimerRef.current)
+      }
+    },
+    [],
+  )
 
   const handleClose = () => {
     if (router.history.canGoBack()) {
@@ -165,6 +213,8 @@ function WatchPage() {
       defaultSubtitleId={null}
       title={showLabel}
       subtitle={episodeLabel}
+      initialTime={savedProgress?.position_seconds ?? 0}
+      onProgress={persistProgress}
       onClose={handleClose}
     />
   )

@@ -5,6 +5,7 @@ import type {
   ProviderAccount,
   User,
   WatchProgress,
+  UpsertWatchProgressRequest,
 } from '../types'
 
 export class MeResource {
@@ -28,5 +29,9 @@ export class MeResource {
 
   progress() {
     return this.http.get<WatchProgress[]>('/me/progress')
+  }
+
+  updateProgress(request: UpsertWatchProgressRequest) {
+    return this.http.post<WatchProgress>('/me/progress', request)
   }
 }
