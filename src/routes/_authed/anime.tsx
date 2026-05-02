@@ -80,6 +80,9 @@ function AnimePage() {
   )
   const [isLoadingGenre, setIsLoadingGenre] = React.useState(false)
   const [genreError, setGenreError] = React.useState<string | null>(null)
+  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
+    () => new Set(),
+  )
   const genreShows = React.useMemo(
     () =>
       uniqueRowItems(
@@ -95,6 +98,17 @@ function AnimePage() {
     genreShows.length > 0 ||
     isLoadingGenre ||
     filteredRows.some((row) => row.error || row.shows.length > 0)
+
+  const toggleExpandedRow = (key: string) =>
+    setExpandedRows((current) => {
+      const next = new Set(current)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
 
   React.useEffect(() => {
     let cancelled = false
@@ -238,12 +252,15 @@ function AnimePage() {
       <div className="flex flex-col gap-8">
         {filteredWatching.length > 0 && (
           <CardRow
+            rowKey="continue-watching"
             title={
               activeGenre === 'All Genres'
                 ? 'Continue watching'
                 : `Continue watching ${activeGenre}`
             }
             shows={filteredWatching.map(({ addon, show }) => ({ addon, show }))}
+            expanded={expandedRows.has('continue-watching')}
+            onToggleViewAll={() => toggleExpandedRow('continue-watching')}
           />
         )}
         {!hasVisibleShows && (
@@ -257,10 +274,17 @@ function AnimePage() {
             shows={genreShows}
             isLoading={isLoadingGenre}
             error={genreError}
+            expanded={expandedRows.has(`genre:${activeGenre}`)}
+            onToggleViewAll={() => toggleExpandedRow(`genre:${activeGenre}`)}
           />
         )}
         {filteredRows.map((row) => (
-          <AddonCardRow key={row.addon.id} row={row} />
+          <AddonCardRow
+            key={row.addon.id}
+            row={row}
+            expanded={expandedRows.has(`addon:${row.addon.id}`)}
+            onToggleViewAll={() => toggleExpandedRow(`addon:${row.addon.id}`)}
+          />
         ))}
       </div>
     </div>
@@ -448,10 +472,6 @@ function GenreRow({
           </button>
         ))}
       </div>
-      <Button variant="ghost" size="sm" className="shrink-0 gap-1">
-        View All
-        <ChevronRight className="size-3.5" />
-      </Button>
     </div>
   )
 }
@@ -466,11 +486,15 @@ function GenreResultsRow({
   shows,
   isLoading,
   error,
+  expanded,
+  onToggleViewAll,
 }: {
   genre: string
   shows: RowItem[]
   isLoading: boolean
   error: string | null
+  expanded: boolean
+  onToggleViewAll: () => void
 }) {
   if (error) {
     return (
@@ -495,10 +519,26 @@ function GenreResultsRow({
     )
   }
 
-  return <CardRow title={`${genre} Anime`} shows={shows} />
+  return (
+    <CardRow
+      rowKey={`genre:${genre}`}
+      title={`${genre} Anime`}
+      shows={shows}
+      expanded={expanded}
+      onToggleViewAll={onToggleViewAll}
+    />
+  )
 }
 
-function AddonCardRow({ row }: { row: CatalogRow }) {
+function AddonCardRow({
+  row,
+  expanded,
+  onToggleViewAll,
+}: {
+  row: CatalogRow
+  expanded: boolean
+  onToggleViewAll: () => void
+}) {
   if (row.error) {
     return (
       <section>
@@ -512,20 +552,41 @@ function AddonCardRow({ row }: { row: CatalogRow }) {
 
   return (
     <CardRow
+      rowKey={`addon:${row.addon.id}`}
       title={`${addonName(row.addon)} Anime`}
       shows={row.shows.map((show) => ({ addon: row.addon, show }))}
+      expanded={expanded}
+      onToggleViewAll={onToggleViewAll}
     />
   )
 }
 
-function CardRow({ title, shows }: { title: string; shows: RowItem[] }) {
+function CardRow({
+  rowKey,
+  title,
+  shows,
+  expanded = false,
+  onToggleViewAll,
+}: {
+  rowKey: string
+  title: string
+  shows: RowItem[]
+  expanded?: boolean
+  onToggleViewAll?: () => void
+}) {
   if (shows.length === 0) return null
+  const visibleShows = expanded ? shows : shows.slice(0, 8)
 
   return (
-    <section>
-      <SectionHeader title={title} />
+    <section data-row-key={rowKey}>
+      <SectionHeader
+        title={title}
+        canViewAll={shows.length > 8}
+        expanded={expanded}
+        onToggleViewAll={onToggleViewAll}
+      />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
-        {shows.slice(0, 8).map((item) => (
+        {visibleShows.map((item) => (
           <ShowCard
             key={`${item.addon.id}:${item.show.id}`}
             addon={item.addon}
@@ -537,18 +598,33 @@ function CardRow({ title, shows }: { title: string; shows: RowItem[] }) {
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({
+  title,
+  canViewAll = false,
+  expanded = false,
+  onToggleViewAll,
+}: {
+  title: string
+  canViewAll?: boolean
+  expanded?: boolean
+  onToggleViewAll?: () => void
+}) {
   return (
     <div className="mb-3 flex items-center justify-between">
       <h2 className="text-base font-semibold tracking-tight">{title}</h2>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-auto gap-1 px-2 py-1 text-xs text-muted-foreground"
-      >
-        View All
-        <ChevronRight className="size-3.5" />
-      </Button>
+      {canViewAll && onToggleViewAll && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-auto gap-1 px-2 py-1 text-xs text-muted-foreground"
+          onClick={onToggleViewAll}
+        >
+          {expanded ? 'Show Less' : 'View All'}
+          <ChevronRight
+            className={cn('size-3.5 transition-transform', expanded && 'rotate-90')}
+          />
+        </Button>
+      )}
     </div>
   )
 }
