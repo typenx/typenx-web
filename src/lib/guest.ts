@@ -31,6 +31,10 @@ export function getGuestProgress(animeId: string, episodeId: string | null) {
   )
 }
 
+export function getGuestProgressForAnime(animeId: string) {
+  return getGuestProgressRows().filter((row) => row.anime_id === animeId)
+}
+
 export function saveGuestProgress(progress: Omit<GuestWatchProgress, 'updated_at'>) {
   if (typeof window === 'undefined') return
   const rows = getGuestProgressRows()

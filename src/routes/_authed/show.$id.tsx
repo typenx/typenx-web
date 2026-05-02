@@ -45,9 +45,15 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { getGuestProgressForAnime, isGuestMode } from '#/lib/guest'
 import { withAuthRedirect } from '#/lib/loaders'
 import { isTypenxApiError, typenx } from '#/sdk'
-import type { AnimeMetadata, EpisodeMetadata } from '#/sdk'
+import type { AnimeMetadata, EpisodeMetadata, WatchProgress } from '#/sdk'
+
+type ShowLoaderData = {
+  show: AnimeMetadata
+  progress: WatchProgress[]
+}
 
 export const Route = createFileRoute('/_authed/show/$id')({
   validateSearch: (
@@ -72,9 +78,33 @@ export const Route = createFileRoute('/_authed/show/$id')({
   }),
   loaderDeps: ({ search }) => ({ addonId: search.addon_id }),
   loader: ({ params, deps, location }) =>
-    withAuthRedirect(async () => {
+    withAuthRedirect(async (): Promise<ShowLoaderData> => {
       try {
-        return await typenx.catalog.anime(params.id, deps.addonId)
+        const guest = isGuestMode()
+        const [show, progress] = await Promise.all([
+          typenx.catalog.anime(params.id, deps.addonId),
+          guest
+            ? Promise.resolve<WatchProgress[]>(
+                getGuestProgressForAnime(params.id).map((row) => ({
+                  id: `${row.anime_id}:${row.episode_id ?? 'none'}`,
+                  user_id: 'guest',
+                  anime_id: row.anime_id,
+                  episode_id: row.episode_id,
+                  episode_number: row.episode_number,
+                  position_seconds: row.position_seconds,
+                  duration_seconds: row.duration_seconds,
+                  completed: row.completed,
+                  updated_at: row.updated_at,
+                })),
+              )
+            : typenx.me
+                .progress()
+                .then((rows) =>
+                  rows.filter((row) => row.anime_id === params.id),
+                )
+                .catch(() => []),
+        ])
+        return { show, progress }
       } catch (err) {
         if (isTypenxApiError(err) && err.status === 404) {
           throw notFound()
@@ -91,8 +121,8 @@ export const Route = createFileRoute('/_authed/show/$id')({
 })
 
 function ShowDetailPage() {
-  const show = Route.useLoaderData()
-  return <ShowView show={show} />
+  const { show, progress } = Route.useLoaderData()
+  return <ShowView show={show} progress={progress} />
 }
 
 function ShowPending() {
@@ -138,7 +168,13 @@ function ShowNotFound() {
   )
 }
 
-function ShowView({ show }: { show: AnimeMetadata }) {
+function ShowView({
+  show,
+  progress,
+}: {
+  show: AnimeMetadata
+  progress: WatchProgress[]
+}) {
   const navigate = useNavigate({ from: Route.fullPath })
   const rootNavigate = useNavigate()
   const search = Route.useSearch()
@@ -156,6 +192,12 @@ function ShowView({ show }: { show: AnimeMetadata }) {
     seasons.find((s) => s.number === activeSeason)?.episodes ??
     seasons.at(0)?.episodes ??
     []
+
+  const resumeEpisode = React.useMemo(
+    () => pickResumeEpisode(show.episodes, progress),
+    [show.episodes, progress],
+  )
+  const isResuming = !!resumeEpisode
 
   const order = search.order ?? 'asc'
   const activeEpisodes = React.useMemo(() => {
@@ -184,21 +226,25 @@ function ShowView({ show }: { show: AnimeMetadata }) {
       replace: true,
     })
 
-  const playFirstEpisode = () => {
-    if (seasonEpisodes.length === 0) return
-    const first = seasonEpisodes[0]
+  const playEpisode = (episode: EpisodeMetadata) => {
     void rootNavigate({
       to: '/watch/$id',
-      params: { id: first.id },
+      params: { id: episode.id },
       search: {
         show_id: show.id,
         show: show.title,
         addon_id: search.addon_id,
-        season: first.season_number ?? first.season ?? undefined,
-        episode: first.number,
-        title: first.title ?? undefined,
+        season: episode.season_number ?? episode.season ?? undefined,
+        episode: episode.number,
+        title: episode.title ?? undefined,
       },
     })
+  }
+
+  const playPrimary = () => {
+    const target = resumeEpisode ?? seasonEpisodes[0]
+    if (!target) return
+    playEpisode(target)
   }
 
   return (
@@ -261,11 +307,17 @@ function ShowView({ show }: { show: AnimeMetadata }) {
                 <Button
                   size="lg"
                   className="gap-2"
-                  disabled={seasonEpisodes.length === 0}
-                  onClick={playFirstEpisode}
+                  disabled={show.episodes.length === 0}
+                  onClick={playPrimary}
                 >
                   <Play className="fill-current" />
-                  Watch Now
+                  {isResuming
+                    ? `Continue Watching${
+                        resumeEpisode?.number
+                          ? ` · Ep ${resumeEpisode.number}`
+                          : ''
+                      }`
+                    : 'Watch Now'}
                 </Button>
                 <Button size="lg" variant="secondary" disabled className="gap-2">
                   <Plus />
@@ -364,23 +416,7 @@ function ShowView({ show }: { show: AnimeMetadata }) {
                         <EpisodeRow
                           key={episode.id}
                           episode={episode}
-                          onPlay={() =>
-                            void rootNavigate({
-                              to: '/watch/$id',
-                              params: { id: episode.id },
-                              search: {
-                                show_id: show.id,
-                                show: show.title,
-                                addon_id: search.addon_id,
-                                season:
-                                  episode.season_number ??
-                                  episode.season ??
-                                  undefined,
-                                episode: episode.number,
-                                title: episode.title ?? undefined,
-                              },
-                            })
-                          }
+                          onPlay={() => playEpisode(episode)}
                         />
                       ))}
                     </ItemGroup>
@@ -807,6 +843,44 @@ function EpisodeRow({
       </button>
     </Item>
   )
+}
+
+function pickResumeEpisode(
+  episodes: EpisodeMetadata[],
+  progress: WatchProgress[],
+): EpisodeMetadata | null {
+  if (episodes.length === 0 || progress.length === 0) return null
+
+  const sorted = [...progress].sort(
+    (a, b) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  )
+  const latest = sorted[0]
+
+  const matchByEpisodeId = (id: string | null) =>
+    id ? episodes.find((episode) => episode.id === id) : undefined
+  const matchByNumber = (number: number | null) =>
+    number != null ? episodes.find((episode) => episode.number === number) : undefined
+
+  if (!latest.completed) {
+    const current =
+      matchByEpisodeId(latest.episode_id) ?? matchByNumber(latest.episode_number)
+    if (current) return current
+  }
+
+  const reference =
+    matchByEpisodeId(latest.episode_id) ?? matchByNumber(latest.episode_number)
+  if (!reference) return null
+
+  const ordered = [...episodes].sort((a, b) => {
+    const seasonA = a.season_number ?? a.season ?? 0
+    const seasonB = b.season_number ?? b.season ?? 0
+    if (seasonA !== seasonB) return seasonA - seasonB
+    return a.number - b.number
+  })
+  const index = ordered.findIndex((episode) => episode.id === reference.id)
+  if (index < 0) return null
+  return ordered[index + 1] ?? null
 }
 
 function groupBySeason(episodes: EpisodeMetadata[]) {
