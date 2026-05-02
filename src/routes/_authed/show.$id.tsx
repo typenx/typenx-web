@@ -179,6 +179,7 @@ function ShowView({
   const rootNavigate = useNavigate()
   const search = Route.useSearch()
   const poster = show.poster
+  const episodeFallbackImage = show.poster ?? show.banner
   const description = show.description ?? show.synopsis
   const seasons = React.useMemo(
     () => groupBySeason(show.episodes),
@@ -416,6 +417,7 @@ function ShowView({
                         <EpisodeRow
                           key={episode.id}
                           episode={episode}
+                          fallbackImage={episodeFallbackImage}
                           onPlay={() => playEpisode(episode)}
                         />
                       ))}
@@ -794,18 +796,22 @@ function visiblePages(
 
 function EpisodeRow({
   episode,
+  fallbackImage,
   onPlay,
 }: {
   episode: EpisodeMetadata
+  fallbackImage?: string | null
   onPlay: () => void
 }) {
+  const thumbnail = episode.thumbnail ?? fallbackImage
+
   return (
     <Item asChild variant="outline" className="group cursor-pointer">
       <button type="button" onClick={onPlay}>
         <ItemMedia>
-          {episode.thumbnail ? (
+          {thumbnail ? (
             <img
-              src={episode.thumbnail}
+              src={thumbnail}
               alt=""
               className="size-14 rounded-md object-cover"
               loading="lazy"
