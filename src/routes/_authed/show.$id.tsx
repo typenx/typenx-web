@@ -118,6 +118,7 @@ function ShowNotFound() {
 
 function ShowView({ show }: { show: AnimeMetadata }) {
   const navigate = useNavigate({ from: Route.fullPath })
+  const rootNavigate = useNavigate()
   const search = Route.useSearch()
   const poster = show.poster
   const banner = show.banner ?? show.poster
@@ -185,7 +186,28 @@ function ShowView({ show }: { show: AnimeMetadata }) {
             <MetaStrip show={show} />
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="lg" className="gap-2">
+              <Button
+                size="lg"
+                className="gap-2"
+                disabled={show.episodes.length === 0}
+                onClick={() => {
+                  if (show.episodes.length === 0) return
+                  const first = show.episodes[0]
+                  void rootNavigate({
+                    to: '/watch/$id',
+                    params: { id: first.id },
+                    search: {
+                      show_id: show.id,
+                      show: show.title,
+                      addon_id: search.addon_id,
+                      season:
+                        first.season_number ?? first.season ?? undefined,
+                      episode: first.number,
+                      title: first.title ?? undefined,
+                    },
+                  })
+                }}
+              >
                 <Play className="fill-current" />
                 Play
               </Button>
@@ -254,7 +276,25 @@ function ShowView({ show }: { show: AnimeMetadata }) {
             {activeEpisodes.length > 0 ? (
               <ItemGroup className="gap-0 overflow-hidden rounded-xl border border-border bg-card/40 [&>[data-slot=item]+[data-slot=item]]:border-t [&>[data-slot=item]]:rounded-none [&>[data-slot=item]]:border-x-0 [&>[data-slot=item]]:border-y-0">
                 {activeEpisodes.map((episode) => (
-                  <EpisodeRow key={episode.id} episode={episode} />
+                  <EpisodeRow
+                    key={episode.id}
+                    episode={episode}
+                    onPlay={() =>
+                      void rootNavigate({
+                        to: '/watch/$id',
+                        params: { id: episode.id },
+                        search: {
+                          show_id: show.id,
+                          show: show.title,
+                          addon_id: search.addon_id,
+                          season:
+                            episode.season_number ?? episode.season ?? undefined,
+                          episode: episode.number,
+                          title: episode.title ?? undefined,
+                        },
+                      })
+                    }
+                  />
                 ))}
               </ItemGroup>
             ) : (
@@ -446,10 +486,16 @@ function TagList({
   )
 }
 
-function EpisodeRow({ episode }: { episode: EpisodeMetadata }) {
+function EpisodeRow({
+  episode,
+  onPlay,
+}: {
+  episode: EpisodeMetadata
+  onPlay: () => void
+}) {
   return (
     <Item asChild variant="outline" className="group cursor-pointer">
-      <button type="button">
+      <button type="button" onClick={onPlay}>
         <ItemMedia>
           {episode.thumbnail ? (
             <img
