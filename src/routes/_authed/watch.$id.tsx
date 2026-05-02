@@ -13,7 +13,7 @@ import {
   saveGuestProgress,
 } from '#/lib/guest'
 import { typenx } from '#/sdk'
-import type { WatchProgress } from '#/sdk'
+import type { AddonRegistration, WatchProgress } from '#/sdk'
 
 export const Route = createFileRoute('/_authed/watch/$id')({
   validateSearch: (
@@ -142,6 +142,9 @@ function WatchPage() {
   const guestProgress = getGuestProgress(animeId, episodeId)
   const [databaseProgress, setDatabaseProgress] =
     React.useState<WatchProgress | null>(null)
+  const [qualities, setQualities] = React.useState<Array<QualityOption>>(QUALITIES)
+  const [videoError, setVideoError] = React.useState<string | null>(null)
+  const [sourceSubtitles, setSourceSubtitles] = React.useState<Array<SubtitleCountry>>([])
   const progressTimerRef = React.useRef<number | null>(null)
   const latestProgressRef = React.useRef<{
     anime_id: string
@@ -151,6 +154,55 @@ function WatchPage() {
     duration_seconds: number | null
     completed: boolean
   } | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    async function loadVideoSources() {
+      try {
+        const addons = await typenx.addons.list()
+        const addon = pickVideoAddon(addons)
+        if (!addon) {
+          setVideoError('No video source addon is enabled.')
+          return
+        }
+
+        const response = await typenx.catalog.videos({
+          addon_id: addon.id,
+          anime_id: animeId,
+          anime_title: search.show ?? null,
+          episode_id: episodeId,
+          episode_title: search.title ?? null,
+          episode_number: search.episode ?? null,
+          season_number: search.season ?? null,
+        })
+
+        if (cancelled) return
+        if (response.streams.length === 0) {
+          setVideoError(`${addon.manifest?.name ?? 'Video addon'} returned no streams.`)
+          return
+        }
+
+        setQualities(
+          response.streams.map((stream, index) => ({
+            label: stream.quality ?? stream.title ?? `Source ${index + 1}`,
+            url: stream.url,
+          })),
+        )
+        setSourceSubtitles(toSubtitleCountries(response.subtitles ?? []))
+        setVideoError(null)
+      } catch (err) {
+        if (!cancelled) {
+          setVideoError(err instanceof Error ? err.message : 'Unable to load video source.')
+        }
+      }
+    }
+
+    void loadVideoSources()
+    return () => {
+      cancelled = true
+    }
+  }, [animeId, episodeId, search.episode, search.season, search.show, search.title])
 
   React.useEffect(() => {
     let cancelled = false
@@ -251,19 +303,66 @@ function WatchPage() {
 
   return (
     <VideoPlayer
-      qualities={QUALITIES}
+      qualities={qualities}
       defaultQualityIndex={0}
       audioTracks={AUDIO_TRACKS}
       defaultAudioId="jpn"
-      subtitleCountries={subtitleCountries}
+      subtitleCountries={[...sourceSubtitles, ...subtitleCountries]}
       defaultSubtitleId={null}
       title={showLabel}
-      subtitle={episodeLabel}
+      subtitle={videoError ? `${episodeLabel} - ${videoError}` : episodeLabel}
       initialTime={savedProgress?.position_seconds ?? 0}
       onProgress={persistProgress}
       onClose={handleClose}
     />
   )
+}
+
+function pickVideoAddon(addons: AddonRegistration[]) {
+  return addons.find(
+    (addon) =>
+      addon.enabled &&
+      addon.manifest?.resources.includes('video_sources') &&
+      addon.manifest.id === 'typenx-addon-nxvideo',
+  ) ?? addons.find(
+    (addon) =>
+      addon.enabled && addon.manifest?.resources.includes('video_sources'),
+  )
+}
+
+function toSubtitleCountries(
+  subtitles: Array<{
+    id: string
+    label: string
+    language?: string | null
+    url: string
+  }>,
+): Array<SubtitleCountry> {
+  const grouped = new Map<string, SubtitleCountry>()
+  for (const subtitle of subtitles) {
+    const code = subtitle.language ?? 'und'
+    const country = grouped.get(code) ?? {
+      code,
+      name: languageName(code),
+      tracks: [],
+    }
+    country.tracks.push({
+      id: subtitle.id,
+      label: subtitle.label,
+      src: subtitle.url,
+    })
+    grouped.set(code, country)
+  }
+  return [...grouped.values()]
+}
+
+function languageName(code: string) {
+  if (code === 'und') return 'Subtitles'
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code
+  } catch {
+    return code
+  }
 }
 
 function pickSavedProgress(

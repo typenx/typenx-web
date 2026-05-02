@@ -144,7 +144,9 @@ export type SearchRequest = {
 export type VideoSourceRequest = {
   addon_id?: string
   anime_id: string
+  anime_title?: string | null
   episode_id?: string | null
+  episode_title?: string | null
   episode_number?: number | null
   season_number?: number | null
 }
