@@ -921,14 +921,75 @@ function MenuRow({
       <span className="grid size-4 shrink-0 place-items-center text-primary">
         {selected ? <Check className="size-4" /> : null}
       </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1">
+        <MarqueeText text={label} />
+      </span>
       {hint && (
-        <span className="shrink-0 truncate text-xs text-muted-foreground">
-          {hint}
+        <span className="ml-2 min-w-0 max-w-[60%] shrink">
+          <MarqueeText
+            text={hint}
+            className="text-right text-xs text-muted-foreground"
+          />
         </span>
       )}
       {chevron && <ChevronLeft className="size-4 rotate-180 text-muted-foreground" />}
     </button>
+  )
+}
+
+function MarqueeText({
+  text,
+  className,
+}: {
+  text: string
+  className?: string
+}) {
+  const containerRef = React.useRef<HTMLSpanElement>(null)
+  const innerRef = React.useRef<HTMLSpanElement>(null)
+  const [overflow, setOverflow] = React.useState(false)
+  const [duration, setDuration] = React.useState(14)
+
+  React.useLayoutEffect(() => {
+    const container = containerRef.current
+    const inner = innerRef.current
+    if (!container || !inner) return
+    const intrinsic = inner.scrollWidth
+    const available = container.clientWidth
+    const overflows = intrinsic > available + 1
+    setOverflow(overflows)
+    if (overflows) {
+      setDuration(Math.max(8, Math.round(intrinsic / 28)))
+    }
+  }, [text])
+
+  return (
+    <span
+      ref={containerRef}
+      className={cn(
+        'relative block w-full overflow-hidden whitespace-nowrap',
+        className,
+      )}
+    >
+      <span
+        ref={innerRef}
+        className={cn(
+          'inline-block',
+          overflow && 'animate-marquee will-change-transform',
+        )}
+        style={
+          overflow
+            ? ({ ['--marquee-duration' as string]: `${duration}s` } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {text}
+        {overflow && (
+          <span aria-hidden className="ml-12">
+            {text}
+          </span>
+        )}
+      </span>
+    </span>
   )
 }
 

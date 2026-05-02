@@ -5,6 +5,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes marquee-slide {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee-slide var(--marquee-duration, 14s) linear infinite;
+}
+
 * {
   box-sizing: border-box;
 }
