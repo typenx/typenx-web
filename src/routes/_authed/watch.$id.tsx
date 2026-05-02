@@ -152,6 +152,7 @@ function WatchPage() {
   const progressTimerRef = React.useRef<number | null>(null)
   const latestProgressRef = React.useRef<{
     anime_id: string
+    anime_title: string | null
     episode_id: string
     episode_number: number | null
     position_seconds: number
@@ -252,6 +253,7 @@ function WatchPage() {
     }) => {
       const payload = {
         anime_id: animeId,
+        anime_title: search.show ?? null,
         episode_id: episodeId,
         episode_number: search.episode ?? null,
         ...progress,

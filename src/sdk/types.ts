@@ -73,11 +73,13 @@ export type WatchProgress = {
 
 export type UpsertWatchProgressRequest = {
   anime_id: string
+  anime_title?: string | null
   episode_id?: string | null
   episode_number?: number | null
   position_seconds: number
   duration_seconds?: number | null
   completed: boolean
+  score?: number | null
 }
 
 export type AddonResource =
