@@ -5,6 +5,8 @@ import type {
   AnimeMetadata,
   CatalogRequest,
   CatalogResponse,
+  MangaPagesRequest,
+  MangaPagesResponse,
   SearchRequest,
   VideoSourceRequest,
   VideoSourceResponse,
@@ -84,5 +86,9 @@ export class CatalogResource {
     return this.http.get<AnimeMetadata>(
       `/manga/${encodeURIComponent(mangaId)}${query}`,
     )
+  }
+
+  mangaPages(request: MangaPagesRequest) {
+    return this.http.post<MangaPagesResponse>('/manga/pages', request)
   }
 }

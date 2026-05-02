@@ -1,26 +1,32 @@
-import * as React from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 
+import { withAuthRedirect } from '#/lib/loaders'
+import { typenx } from '#/sdk'
+import type { AnimeMetadata, EpisodeMetadata, MangaPageImage } from '#/sdk'
 import { MangaReader } from '#/components/custom/manga-reader'
-import type { ChapterSummary, ReaderChapter } from '#/components/custom/manga-reader'
+import type {
+  ChapterSummary,
+  ReaderChapter,
+  ReaderPage,
+} from '#/components/custom/manga-reader'
 import {
   buildReaderChapter,
   buildSyntheticReaderChapter,
   getFixtureChapter,
 } from '#/lib/manga-fixtures'
 
+type ReaderSearch = {
+  manga_id?: string
+  manga?: string
+  addon_id?: string
+  chapter?: number
+  volume?: number
+  title?: string
+  pages?: number
+}
+
 export const Route = createFileRoute('/_authed/read/$chapterId')({
-  validateSearch: (
-    search,
-  ): {
-    manga_id?: string
-    manga?: string
-    addon_id?: string
-    chapter?: number
-    volume?: number
-    title?: string
-    pages?: number
-  } => ({
+  validateSearch: (search): ReaderSearch => ({
     manga_id: typeof search.manga_id === 'string' ? search.manga_id : undefined,
     manga: typeof search.manga === 'string' ? search.manga : undefined,
     addon_id: typeof search.addon_id === 'string' ? search.addon_id : undefined,
@@ -38,6 +44,13 @@ export const Route = createFileRoute('/_authed/read/$chapterId')({
         ? search.pages
         : undefined,
   }),
+  loader: ({ params, location }) =>
+    withAuthRedirect(
+      () => loadReaderChapter(params.chapterId, location.search as ReaderSearch),
+      location.href,
+    ),
+  staleTime: 5 * 60_000,
+  gcTime: 30 * 60_000,
   component: ReadPage,
 })
 
@@ -46,17 +59,7 @@ function ReadPage() {
   const search = Route.useSearch()
   const navigate = useNavigate()
   const router = useRouter()
-
-  const initialChapter = React.useMemo(
-    () => loadChapter(params.chapterId, search),
-    [params.chapterId, search],
-  )
-
-  const [chapter, setChapter] = React.useState<ReaderChapter>(initialChapter)
-
-  React.useEffect(() => {
-    setChapter(initialChapter)
-  }, [initialChapter])
+  const chapter = Route.useLoaderData()
 
   const handleSelectChapter = (next: ChapterSummary) => {
     void navigate({
@@ -91,17 +94,13 @@ function ReadPage() {
     void navigate({ to: '/manga' })
   }
 
-  const seriesTitle =
-    search.manga ??
-    chapter.title ??
-    'Manga'
-
+  const seriesTitle = search.manga ?? chapter.title ?? 'Manga'
   const fixture = getFixtureChapter(params.chapterId)
 
   return (
     <MangaReader
       seriesTitle={seriesTitle}
-      groupName={fixture?.manga.groupName ?? 'Typenx Sample Scans'}
+      groupName={fixture?.manga.groupName ?? 'Typenx'}
       uploaders={fixture?.manga.uploaders ?? [{ name: 'Typenx' }]}
       chapter={chapter}
       onSelectChapter={handleSelectChapter}
@@ -110,22 +109,109 @@ function ReadPage() {
   )
 }
 
-function loadChapter(
+async function loadReaderChapter(
   chapterId: string,
-  search: {
-    chapter?: number
-    volume?: number
-    title?: string
-    pages?: number
-  },
-): ReaderChapter {
+  search: ReaderSearch,
+): Promise<ReaderChapter> {
   const fixture = getFixtureChapter(chapterId)
   if (fixture) return buildReaderChapter(fixture.manga, fixture.chapter)
-  return buildSyntheticReaderChapter({
-    chapterId,
-    number: search.chapter,
-    volume: search.volume ?? null,
-    title: search.title ?? null,
-    pageCount: search.pages,
-  })
+
+  const fallback = (): ReaderChapter =>
+    buildSyntheticReaderChapter({
+      chapterId,
+      number: search.chapter,
+      volume: search.volume ?? null,
+      title: search.title ?? null,
+      pageCount: search.pages,
+    })
+
+  if (!search.manga_id || (search.chapter == null && !chapterId)) {
+    return fallback()
+  }
+
+  try {
+    const addons = await typenx.addons.list()
+    const pagesAddon = addons.find(
+      (addon) =>
+        addon.enabled && addon.manifest?.resources.includes('manga_pages'),
+    )
+    if (!pagesAddon) return fallback()
+
+    const [pagesResponse, metadata] = await Promise.all([
+      typenx.catalog.mangaPages({
+        addon_id: pagesAddon.id,
+        manga_id: search.manga_id,
+        manga_title: search.manga ?? null,
+        chapter_id: chapterId,
+        chapter_number: search.chapter ?? null,
+      }),
+      search.addon_id
+        ? typenx.catalog
+            .manga(search.manga_id, search.addon_id)
+            .catch(() => null)
+        : Promise.resolve(null),
+    ])
+
+    if (pagesResponse.pages.length === 0) return fallback()
+
+    return buildReaderChapterFromResponse({
+      chapterId,
+      search,
+      pages: pagesResponse.pages,
+      chapterNumber:
+        pagesResponse.chapter_number ?? search.chapter ?? 1,
+      metadata,
+    })
+  } catch {
+    return fallback()
+  }
+}
+
+function buildReaderChapterFromResponse(input: {
+  chapterId: string
+  search: ReaderSearch
+  pages: MangaPageImage[]
+  chapterNumber: number
+  metadata: AnimeMetadata | null
+}): ReaderChapter {
+  const summaries = (input.metadata?.episodes ?? [])
+    .map(toChapterSummary)
+    .sort((a, b) => a.number - b.number)
+  const currentIndex = summaries.findIndex(
+    (summary) => summary.id === input.chapterId,
+  )
+  const prev = currentIndex > 0 ? summaries[currentIndex - 1] : null
+  const next =
+    currentIndex >= 0 && currentIndex < summaries.length - 1
+      ? summaries[currentIndex + 1]
+      : null
+
+  return {
+    id: input.chapterId,
+    number: input.chapterNumber,
+    volume: input.search.volume ?? null,
+    title: input.search.title ?? null,
+    pages: input.pages.map(toReaderPage),
+    prev,
+    next,
+    chapters: summaries,
+  }
+}
+
+function toReaderPage(page: MangaPageImage): ReaderPage {
+  return {
+    number: page.index,
+    src: page.url,
+    width: page.width ?? undefined,
+    height: page.height ?? undefined,
+  }
+}
+
+function toChapterSummary(episode: EpisodeMetadata): ChapterSummary {
+  return {
+    id: episode.id,
+    number: episode.number,
+    volume: episode.season_number ?? episode.season ?? null,
+    title: episode.title,
+  }
 }
