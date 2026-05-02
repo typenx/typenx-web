@@ -7,12 +7,15 @@ import {
 } from '@tanstack/react-router'
 import {
   ArrowLeft,
+  Calendar,
+  Clock,
   ExternalLink,
   Film,
   Loader2,
   Plus,
   Play,
   Star,
+  Users,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
@@ -140,7 +143,6 @@ function ShowView({ show }: { show: AnimeMetadata }) {
   const rootNavigate = useNavigate()
   const search = Route.useSearch()
   const poster = show.poster
-  const banner = show.banner ?? show.poster
   const description = show.description ?? show.synopsis
   const seasons = React.useMemo(
     () => groupBySeason(show.episodes),
@@ -752,183 +754,6 @@ function visiblePages(
   if (end < total - 1) items.push('ellipsis')
   items.push(total)
   return items
-}
-
-function MetaStrip({ show }: { show: AnimeMetadata }) {
-  const items = [
-    show.season_year ?? show.year,
-    show.season ? titleCase(show.season) : null,
-    show.status ? titleCase(show.status.replaceAll('_', ' ')) : null,
-    show.episode_count
-      ? `${show.episode_count} episodes`
-      : show.episodes.length
-        ? `${show.episodes.length} episodes`
-        : null,
-    show.duration_minutes ? `${show.duration_minutes} min` : null,
-  ].filter(Boolean)
-
-  return (
-    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-      {items.map((item, index) => (
-        <React.Fragment key={`${item}-${index}`}>
-          {index > 0 && <span aria-hidden>·</span>}
-          <span>{item}</span>
-        </React.Fragment>
-      ))}
-      {show.score && (
-        <>
-          {items.length > 0 && <span aria-hidden>·</span>}
-          <span className="inline-flex items-center gap-1">
-            <Star className="size-3 fill-current" />
-            {show.score.toFixed(1)}
-          </span>
-        </>
-      )}
-    </div>
-  )
-}
-
-function ShowFacts({ show }: { show: AnimeMetadata }) {
-  return (
-    <aside className="flex flex-col gap-6">
-      <FactGroup title="Details">
-        <FactRow label="Source" value={formatValue(show.source)} />
-        <FactRow label="Rating" value={formatValue(show.rating)} />
-        <FactRow label="Rank" value={show.rank ? `#${show.rank}` : null} />
-        <FactRow
-          label="Popularity"
-          value={show.popularity ? show.popularity.toLocaleString() : null}
-        />
-        <FactRow label="Country" value={show.country_of_origin} />
-        <FactRow label="Started" value={formatDate(show.start_date)} />
-        <FactRow label="Ended" value={formatDate(show.end_date)} />
-      </FactGroup>
-
-      <FactGroup title="Creators">
-        <ChipBlock label="Authors" items={show.authors} />
-        <ChipBlock label="Studios" items={show.studios} />
-        <StaffList staff={show.staff} />
-      </FactGroup>
-
-      <FactGroup title="Tags">
-        <TagList items={show.tags} variant="outline" />
-      </FactGroup>
-
-      <FactGroup title="Alternative Titles">
-        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {show.alternative_titles.length > 0 ? (
-            show.alternative_titles.slice(0, 8).map((title) => (
-              <span key={title} className="leading-relaxed">
-                {title}
-              </span>
-            ))
-          ) : (
-            <span>None provided</span>
-          )}
-        </div>
-      </FactGroup>
-
-      {show.external_links.length > 0 && (
-        <FactGroup title="Links">
-          <div className="flex flex-col gap-2">
-            {show.external_links.slice(0, 6).map((link) => (
-              <a
-                key={`${link.site}-${link.url}`}
-                href={link.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ExternalLink className="size-3" />
-                {link.site}
-              </a>
-            ))}
-          </div>
-        </FactGroup>
-      )}
-    </aside>
-  )
-}
-
-function FactGroup({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="mb-3 text-sm font-semibold tracking-tight">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-function FactRow({
-  label,
-  value,
-}: {
-  label: string
-  value: string | null | undefined
-}) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-border/60 py-2 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value || 'Unknown'}</span>
-    </div>
-  )
-}
-
-function ChipBlock({ label, items }: { label: string; items: string[] }) {
-  return (
-    <div className="mb-4">
-      <p className="mb-2 text-xs font-medium">{label}</p>
-      <TagList items={items} variant="secondary" />
-    </div>
-  )
-}
-
-function StaffList({ staff }: { staff: AnimeMetadata['staff'] }) {
-  if (staff.length === 0) return null
-
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium">Staff</p>
-      <div className="flex flex-col gap-2">
-        {staff.slice(0, 6).map((credit) => (
-          <div key={`${credit.name}-${credit.role}`} className="text-xs">
-            <p className="font-medium">{credit.name}</p>
-            {credit.role && (
-              <p className="text-muted-foreground">{credit.role}</p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TagList({
-  items,
-  variant,
-  className,
-}: {
-  items: string[]
-  variant: 'secondary' | 'outline'
-  className?: string
-}) {
-  if (items.length === 0) return null
-
-  return (
-    <div className={`flex flex-wrap gap-1.5 ${className ?? ''}`}>
-      {items.slice(0, 14).map((item) => (
-        <Badge key={item} variant={variant}>
-          {formatValue(item)}
-        </Badge>
-      ))}
-    </div>
-  )
 }
 
 function EpisodeRow({
