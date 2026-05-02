@@ -1,3 +1,4 @@
+import { isGuestMode } from '#/lib/guest'
 import { typenx } from '#/sdk'
 import type {
   AddonRegistration,
@@ -32,10 +33,11 @@ const OFFICIAL_ADDON_IDS = [
 ]
 
 export async function loadAnimeCatalog(): Promise<AnimeCatalogData> {
+  const guest = isGuestMode()
   const [addons, providers, library] = await Promise.all([
     typenx.addons.list(),
-    typenx.me.providers(),
-    typenx.me.library(),
+    guest ? Promise.resolve<ProviderAccount[]>([]) : typenx.me.providers(),
+    guest ? Promise.resolve<AnimeListEntry[]>([]) : typenx.me.library(),
   ])
   const selectedAddons = selectCatalogAddons(addons, providers)
   const [rows, watching] = await Promise.all([

@@ -19,6 +19,7 @@ import {
 
 import { useAuth } from '#/components/auth-provider'
 import { BrandMark } from '#/components/brand'
+import { isGuestMode, setGuestMode } from '#/lib/guest'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
 import {
@@ -52,12 +53,13 @@ import {
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    if (typeof window === 'undefined') return { user: null }
+    if (typeof window === 'undefined') return { user: null, isGuest: false }
 
     try {
       const current = await typenx.me.current()
-      return { user: current.user }
+      return { user: current.user, isGuest: false }
     } catch {
+      if (isGuestMode()) return { user: null, isGuest: true }
       throw redirect({
         to: '/',
         search: { redirect: location.href },
@@ -201,7 +203,7 @@ function HeaderSearch() {
 }
 
 function UserMenu() {
-  const { user } = Route.useRouteContext()
+  const { user, isGuest } = Route.useRouteContext()
   const { signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -210,8 +212,14 @@ function UserMenu() {
     void navigate({ to: '/', replace: true })
   }
 
-  const username = user?.display_name ?? 'Typenx user'
+  const handleExitGuest = () => {
+    setGuestMode(false)
+    void navigate({ to: '/', replace: true })
+  }
+
+  const username = isGuest ? 'Guest' : user?.display_name ?? 'Typenx user'
   const initial = username.charAt(0).toUpperCase()
+  const subtitle = isGuest ? 'Local only' : 'Signed in'
 
   return (
     <SidebarMenu>
@@ -237,7 +245,7 @@ function UserMenu() {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{username}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Signed in
+                  {subtitle}
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -254,17 +262,23 @@ function UserMenu() {
                   {username}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Local session
+                  {isGuest ? 'No account linked' : 'Local session'}
                 </span>
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => void handleSignOut()}
-              variant="destructive"
-            >
-              <LogOut /> Log out
-            </DropdownMenuItem>
+            {isGuest ? (
+              <DropdownMenuItem onClick={handleExitGuest}>
+                <LogOut /> Sign in
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => void handleSignOut()}
+                variant="destructive"
+              >
+                <LogOut /> Log out
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

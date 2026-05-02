@@ -1,11 +1,14 @@
 import * as React from 'react'
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import { ArrowRight } from 'lucide-react'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { ArrowRight, UserRound } from 'lucide-react'
 
 import { useAuth } from '#/components/auth-provider'
+import { Modal } from '#/components/custom/modal'
 import { friendlyAuthError } from '#/lib/auth-errors'
+import { setGuestMode } from '#/lib/guest'
 import { ModeToggle } from '#/components/mode-toggle'
 import { Button } from '#/components/ui/button'
+import { Separator } from '#/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { typenx } from '#/sdk'
 import type { AuthProvider } from '#/sdk'
@@ -30,7 +33,9 @@ export const Route = createFileRoute('/')({
 
 function LoginPage() {
   const [mode, setMode] = React.useState<'signin' | 'signup'>('signin')
+  const [guestModalOpen, setGuestModalOpen] = React.useState(false)
   const { signIn, signUp } = useAuth()
+  const navigate = useNavigate()
   const search = Route.useSearch()
   const authErrorMessage = friendlyAuthError(search.auth_error)
 
@@ -40,6 +45,11 @@ function LoginPage() {
       return
     }
     void signUp(provider)
+  }
+
+  const handleConfirmGuest = () => {
+    setGuestMode(true)
+    void navigate({ to: '/anime', replace: true })
   }
 
   return (
@@ -98,6 +108,28 @@ function LoginPage() {
           </p>
         )}
 
+        <div className="mt-6 flex w-full items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            or
+          </span>
+          <Separator className="flex-1" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="mt-4 w-full"
+          onClick={() => setGuestModalOpen(true)}
+        >
+          <UserRound />
+          Continue as a guest
+        </Button>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Watch progress is saved to this device only.
+        </p>
+
         <p className="mt-10 text-center text-xs text-muted-foreground">
           By continuing you agree to our{' '}
           <a className="underline-offset-4 hover:underline" href="#">
@@ -110,6 +142,17 @@ function LoginPage() {
           .
         </p>
       </main>
+
+      <Modal
+        open={guestModalOpen}
+        onOpenChange={setGuestModalOpen}
+        variant="warning"
+        title="Continue without an account?"
+        description="Without AniList or MyAnimeList linked, we can't sync your watch progress to either service. Everything stays on this device."
+        confirmLabel="Continue as guest"
+        cancelLabel="Go back"
+        onConfirm={handleConfirmGuest}
+      />
     </div>
   )
 }
