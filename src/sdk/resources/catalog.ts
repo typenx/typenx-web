@@ -6,6 +6,8 @@ import type {
   CatalogRequest,
   CatalogResponse,
   SearchRequest,
+  VideoSourceRequest,
+  VideoSourceResponse,
 } from '../types'
 
 export class CatalogResource {
@@ -63,5 +65,9 @@ export class CatalogResource {
     return this.http.get<AnimeMetadata>(
       `/anime/${encodeURIComponent(animeId)}${query}`,
     )
+  }
+
+  videos(request: VideoSourceRequest) {
+    return this.http.post<VideoSourceResponse>('/videos', request)
   }
 }

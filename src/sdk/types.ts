@@ -80,7 +80,12 @@ export type UpsertWatchProgressRequest = {
   completed: boolean
 }
 
-export type AddonResource = 'catalog' | 'search' | 'anime_meta' | 'episode_meta'
+export type AddonResource =
+  | 'catalog'
+  | 'search'
+  | 'anime_meta'
+  | 'episode_meta'
+  | 'video_sources'
 
 export type ContentType = 'anime' | 'movie' | 'ova' | 'ona' | 'special'
 
@@ -134,6 +139,42 @@ export type SearchRequest = {
   addon_id?: string
   query: string
   limit?: number
+}
+
+export type VideoSourceRequest = {
+  addon_id?: string
+  anime_id: string
+  episode_id?: string | null
+  episode_number?: number | null
+  season_number?: number | null
+}
+
+export type VideoSourceResponse = {
+  streams: VideoStream[]
+  subtitles?: VideoSubtitle[]
+}
+
+export type VideoStream = {
+  id: string
+  title?: string | null
+  url: string
+  quality?: string | null
+  format?: string | null
+  audio_language?: string | null
+  headers: VideoHeader[]
+}
+
+export type VideoHeader = {
+  name: string
+  value: string
+}
+
+export type VideoSubtitle = {
+  id: string
+  label: string
+  language?: string | null
+  url: string
+  format?: string | null
 }
 
 export type AddonSearchResult = {
