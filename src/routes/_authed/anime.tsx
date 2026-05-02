@@ -360,7 +360,7 @@ function ShowCard({
   addon: CatalogRow['addon']
   show: AnimePreview
 }) {
-  const thumb = show.banner ?? show.poster
+  const thumb = show.poster ?? show.banner
   const score =
     typeof show.score === 'number' && Number.isFinite(show.score)
       ? formatScore(show.score)
@@ -373,7 +373,7 @@ function ShowCard({
       search={{ addon_id: addon.id }}
       className="group flex flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-muted ring-1 ring-border/60">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-muted ring-1 ring-border/60">
         {thumb ? (
           <img
             src={thumb}
