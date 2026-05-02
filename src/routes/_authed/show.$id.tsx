@@ -465,7 +465,7 @@ function ShowView({
                   </>
                 ) : (
                   <div className="rounded-xl border border-border bg-card/40 px-4 py-8 text-center text-sm text-muted-foreground">
-                    No {isManga ? 'chapter' : 'episode'} metadata is available from this addon.
+                    <EmptyEntriesMessage show={show} isManga={isManga} />
                   </div>
                 )}
               </section>
@@ -686,6 +686,27 @@ function InfoCard({
       </ul>
     </div>
   )
+}
+
+function EmptyEntriesMessage({
+  show,
+  isManga,
+}: {
+  show: AnimeMetadata
+  isManga: boolean
+}) {
+  if (isManga) {
+    const status = show.status?.replaceAll('_', ' ')
+    return (
+      <>
+        This source does not publish a usable chapter count
+        {status ? ` for this ${status} manga` : ''}. MAL and AniList expose
+        chapter totals when they know them, usually for completed entries.
+      </>
+    )
+  }
+
+  return <>No episode metadata is available from this addon.</>
 }
 
 function CastCard({ staff }: { staff: AnimeMetadata['staff'] }) {
